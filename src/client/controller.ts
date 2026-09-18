@@ -23,7 +23,6 @@ import {
   highlightSpecialChars,
   hoverTooltip,
   keymap,
-  lineNumbers,
   rectangularSelection,
   WidgetType,
   ViewPlugin,
@@ -77,6 +76,14 @@ import * as decoding from "lib0/decoding";
 import { diffLines } from "diff";
 import * as Y from "yjs";
 
+import { createFileTabs } from "./file-tabs";
+import { installPdfWheel } from "./pdf-wheel";
+import { darkenPdfCanvas, downloadPdf, downloadPdfBytes } from './pdf-appearance';
+import { setupPreferences, editorPreferences, preferenceExtensions, isDarkTheme, isDarkPdf } from './preferences';
+import { projectReviews } from "./visual-review";
+import { RichEditor } from "./rich-editor";
+import { setupWorkspace } from "./workspace";
+import { createFileTree } from "./file-tree";
 import { parseReviews, stripReviewStorage, type ReviewItem } from "../shared/review.ts";
 import { referenceLinks, referenceDefinition, type ReferenceLink } from "../shared/references.ts";
 import { buildDiagnostics, compileErrors } from "../shared/compile-errors.ts";
@@ -153,9 +160,8 @@ const elements = Object.fromEntries([
   "project-list", "project-name", "projects-page", "review-cancel", "review-close", "review-list", "review-pane", "review-text", "rotate-share-secret", "share-link", "share-project", "suggest-edit", "sync-state",
   "git-button", "git-change-count", "git-close", "git-commit", "git-conflict", "git-conflict-branch", "git-dialog", "git-dirty", "git-file-list",
   "git-history", "git-message", "git-refresh", "git-resolve", "git-summary",
-  "toast", "toggle-files", "upload-file", "upload-input", "selection-actions", "selection-accept",
+  "toast", "toggle-files", "collapse-files", "collapse-output", "collapse-editor", "new-folder", "rich-text-toggle", "rich-editor", "workspace", "upload-file", "upload-input", "selection-actions", "selection-accept",
 ].map(id => [id.replaceAll("-", "_"), document.getElementById(id)])) as Record<string, AppElement>;
-
 const appearanceDialog = document.getElementById("appearance-dialog") as HTMLDialogElement;
 const themeButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-theme-option]")];
 function syncThemeControls(): void {
@@ -393,131 +399,53 @@ function renderSelectionActions() {
   menu.style.top = `${top}px`;
 }
 
-function fileIcon(file: ProjectFile): string {
-  if (IMAGE_PREVIEW_PATTERN.test(file.path)) return "image";
-  if (/\.pdf$/i.test(file.path)) return "file-check-2";
-  return file.text ? "file-text" : "file";
-}
-
-const collapsedFolders = new Set<string>();
-const expandedFolders = new Set<string>();
-
+const workspaceLayout = setupWorkspace();
+const fileTabs = createFileTabs(document.getElementById("file-tabs")!, path => void openFile(path));
+const fileTree = createFileTree(elements.file_list, {
+  open: openFile, rename: renameEntry, remove: deleteEntry, create: createEntry,
+  move: moveEntry,
+  download: path => { const a = document.createElement('a'); a.href = projectApiUrl(`v1/files?path=${encodeURIComponent(path)}`).toString(); a.download = path.split('/').at(-1)!; a.click(); },
+});
 function renderFiles() {
-  elements.file_list.replaceChildren();
-  type FileTree = { folders: Map<string, FileTree>; files: typeof state.files };
-  const root: FileTree = { folders: new Map(), files: [] };
-  for (const path of state.folders || []) {
-    let node = root;
-    for (const name of path.split("/")) {
-      if (!node.folders.has(name)) node.folders.set(name, { folders: new Map(), files: [] });
-      node = node.folders.get(name)!;
-    }
-  }
-  for (const file of state.files) {
-    let node = root;
-    const parts = file.path.split("/");
-    for (const name of parts.slice(0, -1)) {
-      if (!node.folders.has(name)) node.folders.set(name, { folders: new Map(), files: [] });
-      node = node.folders.get(name)!;
-    }
-    node.files.push(file);
-  }
-  const renderTree = (node: FileTree, parent: HTMLElement, prefix = "") => {
-    for (const [name, child] of [...node.folders].sort(([left], [right]) => left.localeCompare(right))) {
-      const folderPath = prefix ? `${prefix}/${name}` : name;
-      const key = `${state.projectId}/${folderPath}`;
-      const folder = document.createElement("details");
-      folder.className = "file-folder [&[open]>summary_.folder-chevron]:rotate-90";
-      folder.dataset.path = folderPath;
-      folder.open = expandedFolders.has(key) && !collapsedFolders.has(key);
-      const header = document.createElement("summary");
-      header.className = "flex h-8 cursor-pointer list-none items-center gap-1.5 rounded px-2 text-xs hover:bg-accent [&_svg]:size-3.5 [&_.folder-chevron]:transition-transform";
-      header.title = folderPath;
-      header.innerHTML = '<i data-lucide="chevron-right" class="folder-chevron shrink-0"></i><i data-lucide="folder" class="shrink-0 text-muted-foreground"></i><span class="min-w-0 flex-1 truncate"></span>';
-      header.querySelector("span")!.textContent = name;
-      const create = document.createElement("button");
-      create.type = "button";
-      create.className = "grid size-7 shrink-0 place-items-center rounded hover:bg-muted";
-      create.title = `New file in ${folderPath}`;
-      create.setAttribute("aria-label", create.title);
-      create.innerHTML = '<i data-lucide="file-plus-2"></i>';
-      create.addEventListener("click", event => {
-        event.preventDefault();
-        event.stopPropagation();
-        newFile(folderPath);
-      });
-      header.append(create);
-      header.append(folderMenu(folderPath));
-      enableFileDrag(header, folderPath);
-      enableFileDrop(header, folderPath);
-      const children = document.createElement("div");
-      children.className = "ml-3 border-l pl-1";
-      renderTree(child, children, folderPath);
-      folder.append(header, children);
-      folder.addEventListener("toggle", () => {
-        if (!folder.isConnected) return;
-        if (folder.open) { collapsedFolders.delete(key); expandedFolders.add(key); }
-        else { collapsedFolders.add(key); expandedFolders.delete(key); }
-      });
-      parent.append(folder);
-    }
-    for (const file of [...node.files].sort((left, right) => left.path.localeCompare(right.path))) {
-    const row = document.createElement("div");
-    row.className = `file-item group grid h-8 w-full grid-cols-[minmax(0,1fr)_2rem] items-center rounded hover:bg-accent${file.path === state.activeFile ? " bg-accent" : ""}`;
-    const button = document.createElement("button");
-    button.className = `file-row grid h-8 min-w-0 grid-cols-[1rem_minmax(0,1fr)] items-center gap-2 rounded-l px-2 text-left text-xs [&_svg]:size-3.5 [&_span]:truncate${file.path === state.activeFile ? " active font-semibold text-primary" : ""}`;
-    button.title = file.path;
-    button.innerHTML = `<i data-lucide="${fileIcon(file)}"></i><span></span>`;
-    button.querySelector("span").textContent = file.path.split("/").at(-1);
-    button.addEventListener("click", () => openFile(file.path));
-    enableFileDrag(row, file.path);
-    const menu = document.createElement("details");
-    menu.className = "file-actions context-menu relative";
-    menu.innerHTML = '<summary class="icon-button grid size-8 cursor-pointer list-none place-items-center rounded hover:bg-accent [&_svg]:size-3.5" title="File actions"><i data-lucide="more-horizontal"></i></summary><div class="context-menu-panel fixed z-40 w-40 rounded-md border bg-card p-1 shadow-xl"></div>';
-    const panel = menu.querySelector("div");
-    menu.addEventListener("toggle", () => {
-      if (!menu.open) return;
-      for (const openMenu of elements.file_list.querySelectorAll(".file-actions[open]")) {
-        if (openMenu !== menu) openMenu.removeAttribute("open");
-      }
-      const trigger = menu.querySelector("summary").getBoundingClientRect();
-      const width = panel.getBoundingClientRect().width || 160;
-      const height = panel.getBoundingClientRect().height || 72;
-      panel.style.left = `${Math.max(8, Math.min(window.innerWidth - width - 8, trigger.right - width))}px`;
-      panel.style.top = `${trigger.bottom + height + 8 <= window.innerHeight ? trigger.bottom + 4 : Math.max(8, trigger.top - height - 4)}px`;
-    });
-    const actions: Array<[string, string, () => void | Promise<void>, boolean?]> = [
-      ["download", "Download", () => {
-        const anchor = document.createElement("a");
-        anchor.href = String(projectApiUrl(`v1/files?path=${encodeURIComponent(file.path)}`));
-        anchor.download = file.path.split("/").at(-1);
-        anchor.click();
-      }],
-      ["pencil", "Rename", () => renameFile(file.path)],
-      ["trash-2", "Delete file", () => deleteFile(file.path), true],
-    ];
-    for (const [icon, label, action, danger] of actions) {
-      const actionButton = document.createElement("button");
-      actionButton.type = "button";
-      actionButton.className = `flex h-8 w-full items-center gap-2 rounded px-2 text-left text-xs hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:size-3.5${danger ? " text-destructive" : ""}`;
-      actionButton.innerHTML = `<i data-lucide="${icon}"></i><span></span>`;
-      actionButton.querySelector("span").textContent = label;
-      if (danger && file.path === state.main) {
-        actionButton.disabled = true;
-        actionButton.title = "The main document cannot be deleted";
-      }
-      actionButton.addEventListener("click", () => {
-        menu.open = false;
-        action();
-      });
-      panel.append(actionButton);
-    }
-    row.append(button, menu);
-    parent.append(row);
-    }
-  };
-  renderTree(root, elements.file_list);
-  createIcons({ icons: ICONS });
+  fileTabs.update(state.files, state.activeFile, state.projectId);
+  fileTree.render({ files: state.files, directories: state.folders || [], active: state.activeFile, main: state.main || "" }, state.projectId);
+}
+async function moveEntry(from: string, to: string) {
+  const active = state.activeFile;
+  const affected = active === from || active.startsWith(from + "/");
+  try {
+    await request("v1/files/move", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({from, to}) });
+    fileTabs.move(from, to);
+    if (affected) { disconnectEditor(); state.activeFile = to + active.slice(from.length); }
+    fileTree.reveal(to);
+    await refreshProject(affected);
+  } catch (error) { showToast(error.message); }
+}
+async function renameEntry(target: string, folder: boolean) {
+  const name = await openActionDialog({ title: folder ? "Rename folder" : "Rename file", label: "Path", value: target, submitLabel: "Rename" });
+  if (name && name !== target) await moveEntry(target, String(name));
+}
+async function deleteEntry(target: string, folder: boolean) {
+  if (!folder) return deleteFile(target);
+  const confirmed = await openActionDialog({ title: "Delete folder?", message: `Delete “${target}” and all files inside it? You can restore them from Deleted files in Project settings.`, submitLabel: "Delete folder", danger: true });
+  if (!confirmed) return;
+  const affected = state.activeFile.startsWith(target + "/");
+  try {
+    await request(`v1/files?path=${encodeURIComponent(target)}`, { method: "DELETE" });
+    if (affected) { disconnectEditor(); state.activeFile = ""; }
+    await refreshProject(affected); showToast("Folder deleted.");
+  } catch (error) { showToast(error.message); }
+}
+async function createEntry(parent: string, folder: boolean) {
+  const name = await openActionDialog({ title: folder ? "New folder" : "New file", label: "Path", value: (parent ? parent + "/" : "") + (folder ? "untitled" : "chapter.tex"), submitLabel: "Create" });
+  if (!name) return;
+  try {
+    if (!folder && state.files.some(file => file.path === name)) throw new Error("A file already exists at this path.");
+    if (folder) await request("v1/files/folder", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({path: name}) });
+    else await request(`v1/files?path=${encodeURIComponent(String(name))}`, { method: "PUT", headers: {"Content-Type": "text/plain; charset=utf-8"}, body: "" });
+    fileTree.reveal(String(name) + (folder ? "/" : "")); await refreshProject();
+    if (!folder) await openFile(String(name));
+  } catch (error) { showToast(error.message); }
 }
 
 elements.file_list.addEventListener("scroll", () => {
@@ -885,8 +813,9 @@ window.addEventListener("blur", () => setReferenceControl(false));
 
 function editorExtensions(ytext: Y.Text, provider: Pick<WebsocketProvider, "awareness">): Extension[] {
   const undoManager = new Y.UndoManager(ytext, { trackedOrigins: new Set() });
+  state.undoManager = undoManager;
   return [
-    lineNumbers(),
+    editorPreferences.of(preferenceExtensions()),
     highlightActiveLineGutter(),
     highlightSpecialChars(),
     ViewPlugin.define(view => {
@@ -953,11 +882,11 @@ function editorExtensions(ytext: Y.Text, provider: Pick<WebsocketProvider, "awar
     protectReviewStorage,
     EditorView.clipboardOutputFilter.of(source => stripReviewStorage(source)),
     keymap.of([...yUndoManagerKeymap, ...defaultKeymap, ...searchKeymap, indentWithTab]),
-    EditorView.lineWrapping,
     EditorView.updateListener.of(update => {
       if (update.docChanged || update.selectionSet) closeEditorContextMenu();
       if (update.docChanged) {
         queueReviewRender();
+        queueMicrotask(() => { visualEditor.sync(); visualEditor.refreshReviews(); });
         elements.git_dirty.hidden = false;
         markPdfStale();
         scheduleAutoCompile();
@@ -967,18 +896,18 @@ function editorExtensions(ytext: Y.Text, provider: Pick<WebsocketProvider, "awar
       }
     }),
     EditorView.theme({
-      "&": { width: "100%", maxWidth: "100%", minWidth: "0", height: "100%", overflow: "hidden", backgroundColor: "var(--editor-background)", color: "var(--editor-foreground)", fontSize: "13px" },
-      ".cm-scroller": { minWidth: "0", overflow: "auto", fontFamily: "SFMono-Regular, Consolas, Liberation Mono, monospace", lineHeight: "1.55" },
-      ".cm-gutters": { borderRight: "1px solid var(--border)", color: "var(--editor-gutter-foreground)", backgroundColor: "var(--editor-gutter)" },
-      ".cm-activeLine, .cm-activeLineGutter": { backgroundColor: "var(--editor-active-line)" },
-      ".cm-content": { minWidth: "0", padding: "12px 0", caretColor: "var(--primary)" },
+      "&": { width: "100%", maxWidth: "100%", minWidth: "0", height: "100%", overflow: "hidden", backgroundColor: "var(--code-background)", color: "var(--code-foreground)", fontSize: "var(--code-font-size, 13px)" },
+      ".cm-scroller": { minWidth: "0", overflow: "auto", fontFamily: "SFMono-Regular, Consolas, Liberation Mono, monospace", lineHeight: "var(--code-line-height, 1.6)" },
+      ".cm-gutters": { borderRight: "1px solid var(--code-border)", color: "var(--code-comment)", backgroundColor: "var(--code-gutter)" },
+      ".cm-activeLine, .cm-activeLineGutter": { backgroundColor: "var(--code-active)" },
+      ".cm-content": { minWidth: "0", padding: "12px 0", caretColor: "var(--code-caret)" },
       ".cm-line": { padding: "0 14px" },
-      ".cm-reference-link": { textDecoration: "underline", textUnderlineOffset: "3px", textDecorationThickness: "1.5px", color: "var(--primary)", cursor: "pointer" },
-      "&.cm-focused .cm-cursor": { borderLeftColor: "var(--primary)" },
-      ".cm-review-comment": { padding: "1px 0", borderBottom: "2px solid #d28a16", borderRadius: "2px", backgroundColor: "var(--editor-comment)", cursor: "help" },
-      ".cm-review-insertion": { padding: "1px 0", borderBottom: "2px solid #188064", backgroundColor: "var(--editor-insertion)", color: "var(--editor-insertion-foreground)", textDecoration: "underline", textDecorationColor: "#188064", textUnderlineOffset: "3px", cursor: "help" },
-      ".cm-review-deletion": { marginLeft: "4px", padding: "1px 3px", borderRadius: "3px", backgroundColor: "var(--editor-deletion)", color: "var(--editor-deletion-foreground)", textDecoration: "line-through", textDecorationThickness: "1.5px", cursor: "help", whiteSpace: "pre-wrap" },
-      ".cm-review-tooltip": { width: "min(320px, calc(100vw - 32px))", padding: "11px", border: "1px solid var(--border)", borderLeft: "3px solid #d28a16", borderRadius: "6px", backgroundColor: "var(--card)", boxShadow: "0 10px 28px rgb(0 0 0 / 25%)", color: "var(--card-foreground)", fontFamily: "ui-sans-serif, sans-serif" },
+      "&.cm-focused .cm-cursor": { borderLeftColor: "var(--code-caret)" },
+      ".cm-review-comment": { padding: "1px 0", borderBottom: "2px solid #d28a16", borderRadius: "2px", backgroundColor: "#fff0aa", cursor: "help" },
+      ".cm-review-insertion": { padding: "1px 0", borderBottom: "2px solid #188064", backgroundColor: "#dcefe7", color: "#115b48", textDecoration: "underline", textDecorationColor: "#188064", textUnderlineOffset: "3px", cursor: "help" },
+      ".cm-review-deletion": { marginLeft: "4px", padding: "1px 3px", borderRadius: "3px", backgroundColor: "#f8dddd", color: "#a1373d", textDecoration: "line-through", textDecorationThickness: "1.5px", cursor: "help", whiteSpace: "pre-wrap" },
+      ".cm-review-tooltip": { width: "min(320px, calc(100vw - 32px))", padding: "11px", border: "1px solid #d8dbd5", borderLeft: "3px solid #d28a16", borderRadius: "6px", backgroundColor: "#fff", boxShadow: "0 10px 28px rgb(21 25 20 / 18%)", color: "#292b27", fontFamily: "ui-sans-serif, sans-serif" },
+      ".cm-reference-link": { textDecoration: "underline", color: "var(--code-caret)", cursor: "pointer" },
       ".cm-review-tooltip.revision": { borderLeftColor: "#188064" },
       ".cm-review-tooltip strong": { display: "block", marginBottom: "6px", fontSize: "11px" },
       ".cm-review-tooltip p": { maxHeight: "120px", margin: "0", overflow: "auto", fontSize: "12px", lineHeight: "1.45", whiteSpace: "pre-wrap" },
@@ -1002,6 +931,11 @@ function editorExtensions(ytext: Y.Text, provider: Pick<WebsocketProvider, "awar
 }
 
 function disconnectEditor() {
+  visualEditor.hide();
+  elements.rich_text_toggle.classList.remove("active");
+  document.getElementById("source-mode")?.classList.add("active");
+  document.getElementById("source-mode")?.setAttribute("aria-pressed", "true");
+  elements.rich_text_toggle.setAttribute("aria-pressed", "false");
   closeEditorContextMenu();
   state.provider?.destroy();
   state.view?.destroy();
@@ -1175,15 +1109,13 @@ async function openFile(relativePath: string): Promise<void> {
   disconnectEditor();
   resetFilePreview();
   state.activeFile = relativePath;
-  const parts = relativePath.split("/");
-  for (let index = 1; index < parts.length; index += 1) {
-    collapsedFolders.delete(`${state.projectId}/${parts.slice(0, index).join("/")}`);
-    expandedFolders.add(`${state.projectId}/${parts.slice(0, index).join("/")}`);
-  }
+  fileTree.reveal(relativePath);
   elements.active_file_label.textContent = relativePath;
   elements.binary_view.hidden = file.text;
   elements.editor.hidden = !file.text;
   elements.review_actions.hidden = !file.text;
+  elements.rich_text_toggle.parentElement.hidden = !file.text || !/\.tex$/i.test(relativePath);
+  document.getElementById("format-tools")!.hidden = !file.text;
   renderFiles();
   if (!file.text) {
     elements.sync_state.textContent = "Preview";
@@ -1486,6 +1418,12 @@ function cleanMetadata(value: string): string {
 
 function openReviewDialog() {
   if (!state.view) return showToast("Open a text file first.");
+  if (!elements.rich_editor.hidden) {
+    const visible = visualEditor.selection();
+    if (!visible || visible.from === visible.to) return showToast("Select text first.");
+    const selection = projectReviews(state.view.state.doc.toString()).range(visible.from, visible.to);
+    state.view.dispatch({selection:{anchor:selection.from,head:selection.to}});
+  }
   const selection = state.view.state.selection.main;
   const selected = state.view.state.sliceDoc(selection.from, selection.to);
   if (!selected) return showToast("Select text first.");
@@ -1514,7 +1452,8 @@ elements.review_form.addEventListener("submit", (event: Event) => {
     annotations: reviewMutation.of(true),
   });
   elements.review_dialog.close();
-  state.view.focus();
+  if (elements.rich_editor.hidden) state.view.focus();
+  else { visualEditor.sync(true); workspaceLayout.showOutput(); selectOutput("review"); }
   renderReviews();
 });
 elements.review_close.addEventListener("click", () => elements.review_dialog.close());
@@ -1745,6 +1684,7 @@ async function openProjectPage(projectId: string, push = true): Promise<void> {
   if (state.pdfLoadingTask) await state.pdfLoadingTask.destroy().catch(() => {});
   state.pdfLoadingTask = null;
   state.pdfDocument = null;
+  elements.pdf_download.removeAttribute('href');
   state.pdfHighlights = null;
   elements.pdf_document.replaceChildren();
   elements.pdf_document.hidden = true;
@@ -1773,9 +1713,10 @@ async function renderPdf(priorityPage?: number) {
   const pdf = state.pdfDocument;
   if (!pdf) return;
   const version = ++state.pdfRenderVersion;
+  const dark = isDarkPdf();
   const firstPage = await pdf.getPage(1);
   const base = firstPage.getViewport({ scale: 1 });
-  const fit = Math.min(1.25, Math.max(0.35, (elements.pdf_view.clientWidth - 32) / base.width));
+  const fit = Math.max(0.05, (elements.pdf_view.clientWidth - 32) / base.width);
   const scale = fit * state.pdfZoom;
   const fragment = document.createDocumentFragment();
   const renders: Array<() => Promise<void>> = [];
@@ -1836,6 +1777,7 @@ async function renderPdf(priorityPage?: number) {
         viewport,
         transform: pixelRatio === 1 ? null : [pixelRatio, 0, 0, pixelRatio, 0, 0],
       }).promise;
+      if (dark) darkenPdfCanvas(canvas);
     });
   }
   if (version !== state.pdfRenderVersion) return;
@@ -1915,6 +1857,7 @@ async function compile() {
     });
     if (state.projectId !== project) return;
     elements.build_output.textContent = result.build.log;
+    workspaceLayout.showOutput();
     renderBuildErrors(result.build.log, result.build.errors);
     await showPdf(true);
     selectOutput("pdf");
@@ -2141,7 +2084,7 @@ async function renameProject(project: ProjectSummary): Promise<void> {
 async function deleteProject(project: ProjectSummary): Promise<void> {
   const confirmed = await openActionDialog({
     title: "Delete project",
-    message: `Delete “${project.name}” and all of its files? This cannot be undone.`,
+    message: `Delete “${project.name}” and all of its files? You can restore them from Deleted files in Project settings.`,
     submitLabel: "Delete project",
     danger: true,
   });
@@ -2385,6 +2328,7 @@ elements.new_project.addEventListener("click", async () => {
   } catch (error) { showToast(error.message); }
 });
 elements.compile_button.addEventListener("click", compile);
+elements.add_comment.addEventListener("mousedown", event => event.preventDefault());
 elements.add_comment.addEventListener("click", openReviewDialog);
 elements.selection_accept.addEventListener("mousedown", (event: Event) => event.preventDefault());
 elements.selection_accept.addEventListener("click", () => {
@@ -2395,19 +2339,52 @@ elements.suggest_edit.addEventListener("click", () => {
   state.suggesting = !state.suggesting;
   elements.suggest_edit.classList.toggle("active", state.suggesting);
   elements.suggest_edit.setAttribute("aria-pressed", String(state.suggesting));
-  elements.suggest_edit.querySelector("span").textContent = state.suggesting ? "Suggesting" : "Suggest";
+  elements.suggest_edit.querySelector("span").textContent = state.suggesting ? "Suggest" : "Edit";
   showToast(state.suggesting ? "Suggestion mode on." : "Suggestion mode off.");
-  state.view?.focus();
+  if (elements.rich_editor.hidden) state.view?.focus();
 });
 elements.close_output.addEventListener("click", () => elements.output_pane.classList.remove("mobile-open"));
+installPdfWheel(elements.pdf_view, () => state.pdfZoom, value => { state.pdfZoom = value; }, renderPdf);
 elements.pdf_zoom_out.addEventListener("click", () => {
   state.pdfZoom = Math.max(0.5, state.pdfZoom - 0.15);
   renderPdf();
 });
 elements.pdf_zoom_in.addEventListener("click", () => {
-  state.pdfZoom = Math.min(2, state.pdfZoom + 0.15);
+  state.pdfZoom = Math.min(3, state.pdfZoom + 0.15);
   renderPdf();
 });
+const pdfDownloadDialog = document.getElementById('pdf-download-dialog') as HTMLDialogElement;
+elements.pdf_download.addEventListener('click', event => {
+  event.preventDefault();
+  if (!state.pdfDocument && !elements.pdf_download.getAttribute('href')) return showToast('Compile your document before downloading.');
+  if (isDarkTheme()) {
+    document.getElementById('pdf-download-status')!.textContent = '';
+    pdfDownloadDialog.showModal();
+  } else void savePdf(false);
+});
+async function savePdf(dark: boolean) {
+  const pdf = state.pdfDocument;
+  const status = document.getElementById('pdf-download-status')!;
+  const buttons = [...pdfDownloadDialog.querySelectorAll<HTMLButtonElement>('.download-options button')];
+  buttons.forEach(button => button.disabled = true);
+  status.textContent = dark ? 'Preparing dark paper…' : 'Preparing your original PDF…';
+  try {
+    const name = (elements.project_name.textContent || 'paper').replace(/[^\p{L}\p{N}._-]+/gu, '-');
+    if (pdf) await downloadPdf(pdf, dark, name);
+    else {
+      const response = await fetch(elements.pdf_download.href);
+      if (!response.ok) throw new Error(`PDF request failed (${response.status}). Try compiling again.`);
+      await downloadPdfBytes(new Uint8Array(await response.arrayBuffer()), dark, name);
+    }
+    pdfDownloadDialog.close();
+  } catch (error) {
+    status.textContent = `Could not download the PDF: ${error.message}`;
+    if (!pdfDownloadDialog.open) showToast(status.textContent);
+  } finally { buttons.forEach(button => button.disabled = false); }
+}
+document.getElementById('download-white')!.onclick = () => void savePdf(false);
+document.getElementById('download-dark')!.onclick = () => void savePdf(true);
+document.getElementById('pdf-download-close')!.onclick = () => pdfDownloadDialog.close();
 elements.file_preview_zoom_out.addEventListener("click", () => {
   state.filePreviewZoom = Math.max(0.5, state.filePreviewZoom - 0.2);
   if (!elements.image_preview.hidden) sizeImagePreview();
@@ -2434,39 +2411,9 @@ elements.upload_input.addEventListener("change", async () => {
   } catch (error) { showToast(error.message); }
   elements.upload_input.value = "";
 });
-elements.new_file.addEventListener("click", () => newFile());
-async function newFile(folderPath = "") {
-  const name = await openActionDialog({
-    title: "New file",
-    label: "File path",
-    value: folderPath ? `${folderPath}/chapter.tex` : "chapter.tex",
-    submitLabel: "Create file",
-  });
-  if (!name) return;
-  try {
-    await request(`v1/files?path=${encodeURIComponent(String(name))}`, {
-      method: "PUT",
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
-      body: "",
-    });
-    await refreshProject();
-    await openFile(String(name));
-  } catch (error) { showToast(error.message); }
-}
-async function renameFile(target: string): Promise<void> {
-  const name = await openActionDialog({
-    title: "Rename file",
-    label: "File path",
-    value: target,
-    submitLabel: "Rename",
-  });
-  if (!name || name === target) return;
-  try {
-    await moveFilePath(target, String(name));
-  } catch (error) { showToast(error.message); }
-}
-
-async function deleteFile(target: string): Promise<void> {
+elements.new_file.addEventListener("click", () => createEntry(fileTree.folder, false));
+elements.new_folder.addEventListener("click", () => createEntry(fileTree.folder, true));
+async function deleteFile(target: string) {
   const confirmed = await openActionDialog({
     title: "Delete file",
     message: `Move “${target}” to Recently deleted? It can be restored.`,
@@ -2486,79 +2433,7 @@ async function deleteFile(target: string): Promise<void> {
     await refreshProject(state.activeFile === target || state.activeFile.startsWith(`${target}/`));
   }
 }
-async function moveFilePath(from: string, to: string) {
-  const wasActive = state.activeFile === from || state.activeFile.startsWith(`${from}/`);
-  await request("v1/files/move", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ from, to }) });
-  if (wasActive) { disconnectEditor(); state.activeFile = to + state.activeFile.slice(from.length); }
-  await refreshProject(wasActive);
-  markPdfStale();
-}
-
-function enableFileDrag(element: HTMLElement, path: string) {
-  element.draggable = true;
-  element.addEventListener("dragstart", event => {
-    event.stopPropagation();
-    event.dataTransfer.setData("application/x-project-file", JSON.stringify({ project: state.projectId, path }));
-    event.dataTransfer.effectAllowed = "move";
-  });
-}
-
-function enableFileDrop(element: HTMLElement, folder: string) {
-  element.addEventListener("dragover", event => {
-    if (!event.dataTransfer.types.includes("application/x-project-file")) return;
-    event.preventDefault(); event.stopPropagation();
-    event.dataTransfer.dropEffect = "move";
-    element.classList.add("bg-accent");
-  });
-  element.addEventListener("dragleave", () => element.classList.remove("bg-accent"));
-  element.addEventListener("drop", event => {
-    element.classList.remove("bg-accent");
-    const value = event.dataTransfer.getData("application/x-project-file");
-    if (!value) return;
-    event.preventDefault(); event.stopPropagation();
-    try {
-      const { project, path } = JSON.parse(value);
-      if (project !== state.projectId) return;
-      const to = (folder ? folder + "/" : "") + path.split("/").at(-1);
-      if (path !== to) void moveFilePath(path, to).catch(error => showToast(error.message));
-    } catch (error) { showToast(error.message); }
-  });
-}
-enableFileDrop(elements.file_list, "");
-
-function folderMenu(path: string) {
-  const menu = document.createElement("details");
-  menu.className = "file-actions context-menu relative shrink-0";
-  menu.innerHTML = '<summary title="Folder actions" class="grid size-7 cursor-pointer list-none place-items-center rounded hover:bg-accent [&_svg]:size-3.5"><i data-lucide="more-horizontal"></i></summary><div class="fixed z-40 w-40 rounded-md border bg-card p-1 shadow-xl"></div>';
-  const panel = menu.querySelector("div")!;
-  menu.addEventListener("click", event => event.stopPropagation());
-  menu.addEventListener("toggle", () => {
-    if (!menu.open) return;
-    const bounds = menu.querySelector("summary")!.getBoundingClientRect();
-    panel.style.top = `${Math.min(window.innerHeight - panel.offsetHeight - 8, bounds.bottom)}px`;
-    panel.style.left = `${Math.max(8, Math.min(window.innerWidth - 168, bounds.right - 160))}px`;
-  });
-  for (const [label, run] of [["Rename / move folder", () => renameFile(path)], ["New folder", () => newFolder(path)], ["Delete folder", () => deleteFile(path)]] as const) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "block h-8 w-full rounded px-2 text-left text-xs hover:bg-accent disabled:opacity-40";
-    button.textContent = label;
-    if (label === "Delete folder") button.disabled = state.main.startsWith(path + "/");
-    button.addEventListener("click", event => { event.preventDefault(); event.stopPropagation(); menu.open = false; void run(); });
-    panel.append(button);
-  }
-  return menu;
-}
-
-async function newFolder(prefix = "") {
-  const name = await openActionDialog({ title: "New folder", label: "Folder path", value: prefix ? prefix + "/folder" : "folder", submitLabel: "Create" });
-  if (!name) return;
-  try { await request("v1/files/folder", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: name }) }); await refreshProject(); }
-  catch (error) { showToast(error.message); }
-}
-document.getElementById("new-folder")!.addEventListener("click", () => newFolder());
-
-const settingsDialog = document.getElementById("settings-dialog") as HTMLDialogElement;
+const settingsDialog = document.getElementById("project-settings-dialog") as HTMLDialogElement;
 document.getElementById("project-settings")!.addEventListener("click", async () => {
   try {
     const { settings } = await request<{ settings: EditorSettings }>("v1/settings");
@@ -2571,7 +2446,7 @@ document.getElementById("project-settings")!.addEventListener("click", async () 
     settingsDialog.showModal();
   } catch (error) { showToast(error.message); }
 });
-document.getElementById("settings-close")!.addEventListener("click", () => settingsDialog.close());
+document.getElementById("project-settings-close")!.addEventListener("click", () => settingsDialog.close());
 document.getElementById("settings-form")!.addEventListener("submit", async event => {
   event.preventDefault();
   try {
@@ -2860,99 +2735,85 @@ document.getElementById("search-form")!.addEventListener("submit", async event =
   } catch (error) { if (version === searchVersion) searchStatus.textContent = error.message; }
 });
 
-const workspace = document.getElementById("workspace")!;
-const filesResize = document.getElementById("files-resize")!;
-const outputResize = document.getElementById("output-resize")!;
 const narrowWorkspace = window.matchMedia("(max-width: 760px)");
-const workspaceColumns: Array<[HTMLElement, number]> = [
-  [elements.files_pane, 1], [filesResize, 2],
-  [document.querySelector<HTMLElement>(".editor-pane")!, 3],
-  [outputResize, 4], [elements.output_pane, 5],
-];
-let filesWidth = 208;
-let outputFraction = 0.46;
-let filesHidden = false;
-try {
-  const saved = JSON.parse(localStorage.getItem("workspace-layout") || "null");
-  if (saved) {
-    if (Number.isFinite(saved.filesWidth)) filesWidth = saved.filesWidth;
-    if (Number.isFinite(saved.outputFraction)) outputFraction = saved.outputFraction;
-    filesHidden = saved.filesHidden === true;
-  }
-} catch { /* Ignore unavailable storage or invalid preferences. */ }
-
-function updateWorkspaceLayout() {
-  const mobile = narrowWorkspace.matches;
-  // Hidden separators leave empty tracks; prevent auto-placement shifting panes.
-  for (const [pane, column] of workspaceColumns) pane.style.gridColumn = mobile ? "" : String(column);
-  elements.files_pane.hidden = !mobile && filesHidden;
-  elements.file_list.hidden = !mobile && filesHidden;
-  document.getElementById("files-heading")!.hidden = !mobile && filesHidden;
-  document.getElementById("files-actions")!.hidden = !mobile && filesHidden;
-  filesResize.hidden = !mobile && filesHidden;
-  const width = workspace.clientWidth;
-  if (width && !mobile) {
-    filesWidth = Math.max(180, Math.min(filesWidth, width - 576));
-    const remaining = width - (filesHidden ? 0 : filesWidth + 8) - 8;
-    const output = Math.max(320, Math.min(remaining - 240, remaining * outputFraction));
-    workspace.style.gridTemplateColumns = filesHidden
-      ? `0px 0px minmax(0,1fr) 8px ${output}px`
-      : `${filesWidth}px 8px minmax(0,1fr) 8px ${output}px`;
-  }
-  elements.toggle_files.title = mobile ? "Files" : filesHidden ? "Show files" : "Hide files";
-  elements.toggle_files.setAttribute("aria-expanded", String(mobile ? elements.files_pane.classList.contains("mobile-open") : !filesHidden));
-}
-
-function saveWorkspaceLayout() {
-  try { localStorage.setItem("workspace-layout", JSON.stringify({ filesWidth, outputFraction, filesHidden })); } catch { /* Storage is optional. */ }
-}
-
-for (const handle of [filesResize, outputResize]) {
-  const adjust = (delta: number) => {
-    if (narrowWorkspace.matches) return;
-    if (handle === filesResize) filesWidth += delta;
-    else {
-      const remaining = workspace.clientWidth - (filesHidden ? 0 : filesWidth + 8) - 8;
-      outputFraction = Math.max(320 / remaining, Math.min(1 - 240 / remaining, outputFraction - delta / remaining));
-    }
-    updateWorkspaceLayout();
+elements.toggle_files.addEventListener("click", () => elements.files_pane.classList.toggle("mobile-open"));
+function applyCodeTool(action: string) {
+  const view = state.view;
+  if (!view) return;
+  if (action === "Undo") { state.undoManager?.undo(); return; }
+  if (action === "Redo") { state.undoManager?.redo(); return; }
+  const selection = view.state.selection.main;
+  const selected = view.state.sliceDoc(selection.from,selection.to);
+  const templates: Record<string, string> = {
+    "Bold": `\\textbf{${selected || "text"}}`,
+    "Italic": `\\emph{${selected || "text"}}`,
+    "Add heading": `\\section{${selected || "New section"}}`,
+    "Add bullet list": `\\begin{itemize}\n${(selected || "First item").split("\n").map(line => "\\item " + line).join("\n")}\n\\end{itemize}`,
+    "Add numbered list": `\\begin{enumerate}\n${(selected || "First step").split("\n").map(line => "\\item " + line).join("\n")}\n\\end{enumerate}`,
+    "Add equation": `\\[\n${selected || "E = mc^2"}\n\\]`,
+    "Add table": "\\begin{tabular}{ll}\nColumn 1 & Column 2 \\\\\nValue & Value \\\\\n\\end{tabular}",
+    "Add paragraph": "\n\n" + (selected || "Write something.") + "\n\n",
   };
-  handle.addEventListener("pointerdown", event => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    handle.setPointerCapture(event.pointerId);
-    let previous = event.clientX;
-    const move = (next: PointerEvent) => { adjust(next.clientX - previous); previous = next.clientX; };
-    const stop = () => {
-      handle.removeEventListener("pointermove", move);
-      handle.removeEventListener("pointerup", stop);
-      handle.removeEventListener("lostpointercapture", stop);
-      saveWorkspaceLayout();
-    };
-    handle.addEventListener("pointermove", move);
-    handle.addEventListener("pointerup", stop);
-    handle.addEventListener("lostpointercapture", stop);
-  });
-  handle.addEventListener("keydown", event => {
-    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-    event.preventDefault();
-    adjust((event.key === "ArrowLeft" ? -1 : 1) * (event.shiftKey ? 40 : 10));
-    saveWorkspaceLayout();
-  });
+  const insert = templates[action]; if (insert === undefined) return;
+  view.dispatch({changes:{from:selection.from,to:selection.to,insert},selection:{anchor:selection.from+insert.length},userEvent:"input"}); view.focus();
 }
-elements.toggle_files.addEventListener("click", () => {
-  if (narrowWorkspace.matches) elements.files_pane.classList.toggle("mobile-open");
-  else { filesHidden = !filesHidden; saveWorkspaceLayout(); }
-  updateWorkspaceLayout();
+const visualEditor = new RichEditor(elements.rich_editor, {
+  source: () => projectReviews(state.view?.state.doc.toString() || "").text,
+  marks: () => projectReviews(state.view?.state.doc.toString() || "").marks,
+  review: id => { workspaceLayout.showOutput(); selectOutput("review"); openCommentThread(id); },
+  codeAction: applyCodeTool,
+  change: (from, to, insert) => {
+    if (!state.view) return;
+    const range = projectReviews(state.view.state.doc.toString()).range(from,to);
+    state.view.dispatch({changes: {...range, insert}, userEvent: "input"});
+    queueMicrotask(() => visualEditor.refreshReviews());
+  },
+  image: path => {
+    const parent = state.activeFile.includes("/") ? state.activeFile.slice(0,state.activeFile.lastIndexOf("/")+1) : "";
+    const normalize = (value: string) => { const parts: string[] = []; for (const part of value.split("/")) { if (part === "..") parts.pop(); else if (part && part !== ".") parts.push(part); } return parts.join("/"); };
+    const candidates = [normalize(parent + path), normalize(path)];
+    const candidate = candidates.map(candidate => state.files.find(file => file.path === candidate || file.path.replace(/\.[^.]+$/, "") === candidate)).find(Boolean);
+    const url = projectApiUrl("v1/files"); url.searchParams.set("path", candidate?.path || candidates[0]); return url.toString();
+  },
+  undo: () => { state.undoManager?.undo(); queueMicrotask(() => visualEditor.sync(true)); },
+  redo: () => { state.undoManager?.redo(); queueMicrotask(() => visualEditor.sync(true)); },
+  notice: showToast,
 });
+elements.rich_text_toggle.setAttribute("aria-pressed", "false");
+function setEditorMode(enabled: boolean) {
+  if (!state.view) return;
+  if (enabled === !elements.rich_editor.hidden) return;
+  if (enabled) visualEditor.show(); else visualEditor.hide();
+  elements.editor.hidden = enabled;
+  elements.review_actions.hidden = false;
+  elements.rich_text_toggle.classList.toggle("active", enabled);
+  document.getElementById("source-mode")!.classList.toggle("active", !enabled);
+  document.getElementById("source-mode")!.setAttribute("aria-pressed", String(!enabled));
+  elements.rich_text_toggle.setAttribute("aria-pressed", String(enabled));
+}
+document.getElementById("source-mode")!.addEventListener("click", () => setEditorMode(false));
+elements.rich_text_toggle.addEventListener("click", () => setEditorMode(true));
+document.querySelectorAll<HTMLElement>("[data-output]:not([data-output=review])").forEach(button => button.addEventListener("click", () => selectOutput(button.dataset.output as "pdf" | "review" | "log")));
+setupPreferences({
+  workspace: workspaceLayout,
+  view: () => state.view,
+  renderPdf,
+  zoom: value => { state.pdfZoom = value; void renderPdf(); },
+  openPdf: () => {
+    if (!state.pdfDocument) return showToast('Compile your document to open the PDF.');
+    window.open(elements.pdf_download.href, '_blank', 'noopener,noreferrer');
+  },
+});
+let previewResizeTimer: ReturnType<typeof setTimeout>;
+let previewWidth = 0;
+new ResizeObserver(() => {
+  const width = elements.pdf_view.clientWidth;
+  if (!width || width === previewWidth) return;
+  previewWidth = width; clearTimeout(previewResizeTimer);
+  previewResizeTimer = setTimeout(() => { if (state.pdfDocument) renderPdf().catch(error => console.error(error)); }, 180);
+}).observe(elements.pdf_view);
 document.getElementById("toggle-review")!.addEventListener("click", () => setReviewOpen(Boolean(elements.review_pane.hidden)));
 document.getElementById("close-review")!.addEventListener("click", () => setReviewOpen(false));
-new ResizeObserver(updateWorkspaceLayout).observe(workspace);
-narrowWorkspace.addEventListener("change", updateWorkspaceLayout);
-updateWorkspaceLayout();
-document.querySelectorAll<HTMLElement>("[data-output]:not([data-output=review])").forEach(button => button.addEventListener("click", () => {
-  if (button.dataset.output === "pdf" || button.dataset.output === "review" || button.dataset.output === "log") selectOutput(button.dataset.output);
-}));
 window.addEventListener("beforeunload", () => {
   disconnectEditor();
   resetFilePreview();

@@ -14,7 +14,7 @@ export type PdfBox = { page: number; left: number; top: number; width: number; h
 export type AppState = {
   activeFile: string; projectId: string; projects: ProjectSummary[]; user: CurrentUser | null; bootstrapReady: boolean;
   projectCanManage: boolean; accessShareId: string; git: GitState | null; main: string; files: ProjectFile[]; folders: string[];
-  settings: EditorSettings | null; view: EditorView | null; doc: Y.Doc | null; provider: WebsocketProvider | null;
+  undoManager?: Y.UndoManager; settings: EditorSettings | null; view: EditorView | null; doc: Y.Doc | null; provider: WebsocketProvider | null;
   persistence: IndexeddbPersistence | null; unsaved: boolean; pdfDocument: PDFDocumentProxy | null;
   pdfLoadingTask: PDFDocumentLoadingTask | null; pdfRequestVersion: number; pdfRenderVersion: number; pdfZoom: number;
   pdfSourceRevision: string | null; pdfHighlights: { boxes: PdfBox[]; expires: number } | null;

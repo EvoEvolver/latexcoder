@@ -27,7 +27,7 @@ test("SQLite migrations upgrade a version-one database transactionally", async (
 
   const database = new StateDatabase(stateDir);
   try {
-    assert.equal(database.schemaVersion(), 5);
+    assert.equal(database.schemaVersion(), 6);
     assert.equal(database.ping(), true);
     const upgraded = new DatabaseSync(filename, { readOnly: true });
     try {
@@ -36,6 +36,9 @@ test("SQLite migrations upgrade a version-one database transactionally", async (
       assert.ok(columns("project_sessions").includes("share_id"));
       assert.ok(columns("project_shares").includes("username"));
       assert.ok(columns("builds").includes("source_revision"));
+      assert.ok(columns("build_errors").includes("errors"));
+      assert.ok(columns("project_settings").includes("compiler"));
+      assert.ok(columns("trash_files").includes("directory"));
     } finally {
       upgraded.close();
     }
@@ -85,7 +88,7 @@ test("health endpoints distinguish liveness and readiness", async () => {
     const ready = await readyResponse.json();
     assert.equal(readyResponse.status, 200);
     assert.equal(ready.status, "ready");
-    assert.equal(ready.schemaVersion, 5);
+    assert.equal(ready.schemaVersion, 6);
     assert.deepEqual(ready.queue, { active: 0, queued: 0, concurrency: 2, accepting: true });
     assert.equal(typeof ready.dependencies.git.available, "boolean");
   } finally {
@@ -94,4 +97,30 @@ test("health endpoints distinguish liveness and readiness", async () => {
     await new Promise(resolve => paper.server.close(resolve));
     await rm(stateDir, { recursive: true, force: true });
   }
+});
+
+test("version-five databases gain missing diagnostic tables without losing projects", async () => {
+  const stateDir = await mkdtemp(path.join(os.tmpdir(), "latexcoder-v5-"));
+  try {
+    const fresh = new StateDatabase(stateDir);
+    fresh.close();
+    const legacy = new DatabaseSync(path.join(stateDir, "state.sqlite"));
+    legacy.exec(`INSERT INTO projects (id, name, share_token, created_at) VALUES ('retained', 'Existing paper', 'secret', '2026-01-01');
+      INSERT INTO builds (project_id, status, main_file, log, has_pdf) VALUES ('retained', 'idle', 'main.tex', '', 0);
+      DROP TABLE build_errors; DROP TABLE project_settings; DROP TABLE trash_files; DROP TABLE trash_entries;
+      PRAGMA user_version = 5;`);
+    legacy.close();
+    const upgraded = new StateDatabase(stateDir);
+    assert.equal(upgraded.schemaVersion(), 6);
+    assert.deepEqual(upgraded.getBuild('retained').errors, []);
+    assert.equal(upgraded.getSettings('retained').compiler, 'auto');
+    assert.deepEqual(upgraded.listTrash('retained'), []);
+    upgraded.close();
+    const repeated = new StateDatabase(stateDir);
+    assert.equal(repeated.schemaVersion(), 6);
+    repeated.close();
+    const verify = new DatabaseSync(path.join(stateDir, "state.sqlite"));
+    assert.equal(verify.prepare('SELECT name FROM projects WHERE id = ?').get('retained').name, 'Existing paper');
+    verify.close();
+  } finally { await rm(stateDir, { recursive: true, force: true }); }
 });

@@ -1275,3 +1275,27 @@ test("two Yjs clients collaborate and persist plain LaTeX plus a SQLite snapshot
     secondDoc.destroy();
   });
 });
+
+test("directory tree preserves empty folders and moves descendants without overwriting", async () => {
+  await withServer(async ({base}) => {
+    const put = (file, body) => fetch(`${base}/v1/files?path=${encodeURIComponent(file)}`, {method:'PUT',body});
+    const move = (from,to) => fetch(`${base}/v1/files/move`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from,to})});
+    assert.equal((await fetch(`${base}/v1/files/folder`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:'notes/empty'})})).status,201);
+    assert.ok((await (await fetch(`${base}/v1/project`)).json()).project.folders.includes('notes/empty'));
+    await put('notes/chapter.tex','Keep this text.');
+    await put('existing.tex','Do not overwrite.');
+    assert.equal((await move('notes/chapter.tex','existing.tex')).status,409);
+    assert.equal(await (await fetch(`${base}/v1/files?path=existing.tex`)).text(),'Do not overwrite.');
+    assert.equal((await move('notes','notes/child')).status,400);
+    assert.equal((await move('notes','chapters')).status,200);
+    assert.equal(await (await fetch(`${base}/v1/files?path=chapters/chapter.tex`)).text(),'Keep this text.');
+    assert.equal((await fetch(`${base}/v1/files?path=chapters`,{method:'DELETE'})).status,200);
+    assert.ok(!(await (await fetch(`${base}/v1/project`)).json()).project.folders.includes('chapters'));
+    assert.equal((await move('main.tex','paper/main.tex')).status,200);
+    assert.equal((await fetch(`${base}/v1/files?path=paper`,{method:'DELETE'})).status,409);
+    assert.equal((await move('paper','research')).status,200);
+    assert.equal((await (await fetch(`${base}/v1/project`)).json()).project.main,'research/main.tex');
+    assert.equal((await fetch(`${base}/v1/files?path=.git`,{method:'DELETE'})).status,400);
+    assert.equal((await fetch(`${base}/v1/files/folder`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:'../outside'})})).status,400);
+  });
+});

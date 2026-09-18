@@ -4,12 +4,14 @@ import {
   GitPullRequestCreateArrow, Link, LogIn, LogOut, MessageSquarePlus,
   Monitor, Moon, MoreHorizontal, PanelLeft, Pencil, Play, RefreshCw, Sun, TerminalSquare, Trash2,
   ClipboardPaste, Redo2, Scissors, ScanText, Search, Settings, Undo2, Upload, UserPlus, UserRound, X, ZoomIn, ZoomOut,
+  PanelRight, SquarePen, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { SettingsDialogs, WorkspaceMenus } from './Settings';
 
 const iconButton = "icon-button size-8 p-0";
 const toolButton = "tool-button h-8 px-2.5 text-xs [&.active]:bg-primary [&.active]:text-primary-foreground";
@@ -39,7 +41,11 @@ const iconComponents = {
   "monitor": Monitor,
   "moon": Moon,
   "more-horizontal": MoreHorizontal,
+  "chevron-left": ChevronLeft,
+  "chevron-right": ChevronRight,
   "panel-left": PanelLeft,
+  "panel-right": PanelRight,
+  "square-pen": SquarePen,
   "pencil": Pencil,
   "play": Play,
   "refresh-cw": RefreshCw,
@@ -136,11 +142,12 @@ export function AppShell() {
         </main>
       </div>
 
-      <div id="editor-page" className="app-shell grid h-dvh min-w-80 grid-rows-[3.5rem_minmax(0,1fr)]" hidden>
+      <div id="editor-page" className="app-shell grid h-dvh min-w-80 grid-rows-[2.5rem_minmax(0,1fr)]" hidden>
         <header className="topbar flex min-w-0 items-center gap-2 border-b bg-background px-3">
-          <Button id="back-projects" className="brand-button gap-2 px-1" variant="ghost" title="All projects"><Icon name="arrow-left" /><Brand compact /></Button>
+          <Button id="back-projects" className="brand-button gap-2 px-1" variant="ghost" title="All projects" aria-label="All projects"><Icon name="arrow-left" /></Button>
+          <WorkspaceMenus />
           <div className="project-context flex min-w-28 max-w-52 items-center gap-2 border-l pl-3 max-md:hidden"><Icon name="folder-kanban" /><strong id="project-name" className="truncate text-xs" /></div>
-          <div className="document-name flex min-w-0 flex-1 flex-col"><span id="active-file-label" className="truncate text-sm font-medium">main.tex</span><span id="sync-state" className="text-[10px] text-muted-foreground">Connecting</span></div>
+          <div className="document-name flex min-w-0 flex-1 items-center gap-3"><span id="active-file-label" className="truncate text-xs font-medium">main.tex</span><span id="sync-state" className="shrink-0 text-[10px] text-muted-foreground">Connecting</span></div>
           <div id="presence" className="presence flex min-w-0" aria-label="Active collaborators" />
           <label id="guest-name-field" className="name-field flex h-9 w-36 items-center gap-2 rounded-md border bg-background px-2 max-lg:hidden"><Icon name="user-round" /><Input id="display-name" className="h-7 border-0 p-0 text-xs shadow-none focus-visible:ring-0" maxLength={28} aria-label="Display name" /></label>
           <Button id="editor-account-button" variant="outline" size="sm" hidden><Icon name="user-round" /><span id="editor-account-name" className="max-w-28 truncate max-lg:hidden" /></Button>
@@ -151,7 +158,7 @@ export function AppShell() {
           <ThemeButton id="editor-theme" />
         </header>
 
-        <main id="workspace" className="workspace grid min-h-0 w-full max-w-full grid-cols-[13rem_0.5rem_minmax(0,1fr)_0.5rem_minmax(0,46%)] overflow-hidden max-[760px]:!grid-cols-1">
+        <main id="workspace" className="workspace">
           <aside id="files-pane" className="files-pane flex min-h-0 min-w-0 flex-col border-r bg-muted/35 max-[760px]:fixed max-[760px]:inset-y-14 max-[760px]:left-0 max-[760px]:z-30 max-[760px]:w-64 max-[760px]:-translate-x-full max-[760px]:bg-background max-[760px]:shadow-xl max-[760px]:transition-transform max-[760px]:[&.mobile-open]:translate-x-0">
             <div className="pane-header flex min-h-11 shrink-0 flex-wrap items-center justify-between border-b px-1.5"><strong id="files-heading" className="text-[11px] uppercase text-muted-foreground">Files</strong><div id="files-actions" className="flex min-w-0 flex-wrap items-center gap-0.5">
               <IconButton id="project-search" icon="search" title="Search project" />
@@ -162,17 +169,19 @@ export function AppShell() {
             </div></div>
             <div id="file-list" className="file-list min-h-0 flex-1 overflow-auto p-1.5" />
           </aside>
-          <div id="files-resize" role="separator" aria-label="Resize files" aria-orientation="vertical" tabIndex={0} className="group flex w-2 touch-none cursor-col-resize items-center justify-center bg-muted/40 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary max-[760px]:hidden"><span className="h-8 w-0.5 rounded bg-border group-hover:bg-primary" /></div>
 
-          <section className="editor-pane relative grid min-h-0 min-w-0 grid-rows-[2.75rem_minmax(0,1fr)] border-r">
+          <div id="files-divider" className="pane-divider" role="separator" aria-label="Resize file browser" aria-orientation="vertical" tabIndex={0} data-resize="files"><IconButton id="collapse-files" icon="chevron-left" title="Hide files" /></div>
+          <section id="editor-pane" className="editor-pane relative grid min-h-0 min-w-0 grid-rows-[2.25rem_2.75rem_minmax(0,1fr)] border-r">
+            <div id="file-tabs" className="file-tabs" role="tablist" aria-label="Open files" />
             <div className="editor-toolbar flex items-center justify-between border-b bg-muted/20 px-2">
-              <div id="review-actions" className="review-actions flex items-center gap-1"><IconButton id="toggle-files" icon="panel-left" title="Hide files" /><Button id="add-comment" className={toolButton} variant="ghost" size="sm"><Icon name="message-square-plus" />Comment</Button><Button id="suggest-edit" className={toolButton} variant="ghost" size="sm" aria-pressed="false"><Icon name="git-pull-request-create-arrow" /><span>Suggest</span></Button></div>
-              <div className="editor-actions flex items-center gap-1"><IconButton id="editor-search" icon="search" title="Search project" /><Button id="toggle-review" data-output="review" variant="ghost" size="sm" className="h-8 gap-1 px-2 text-xs" aria-expanded="false" title="Review"><Icon name="message-square-plus" />Review <span id="review-count" className="rounded-full bg-amber-700 px-1.5 text-[9px] text-white">0</span></Button></div>
+              <div id="format-tools" className="format-tools" role="toolbar" aria-label="Document formatting" />
+              <div className="editor-actions flex items-center gap-1"><div className="editor-modes" role="group" aria-label="Editor mode"><Button id="source-mode" className="active" variant="ghost" size="sm" aria-pressed="true">Code</Button><Button id="rich-text-toggle" variant="ghost" size="sm" title="Rich text editing" aria-pressed="false">Visual</Button></div><div id="review-actions" className="review-actions flex items-center gap-1"><IconButton id="add-comment" icon="message-square-plus" title="Comment on selection" /><Button id="suggest-edit" className={toolButton} variant="ghost" size="sm" aria-pressed="false" title="Switch between editing and suggesting"><Icon name="pencil" /><span>Edit</span></Button></div><IconButton id="editor-search" icon="search" title="Search project" /><Button id="toggle-review" data-output="review" variant="ghost" size="sm" aria-expanded="false" title="Review">Review <span id="review-count">0</span></Button><IconButton id="toggle-files" icon="panel-left" title="Files" className="mobile-files hidden max-[760px]:inline-flex" /></div>
             </div>
-            <div id="editor-body" className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] overflow-hidden">
-              <div className="relative grid min-h-0 min-w-0 overflow-hidden">
-                <div id="editor" className="min-h-0 min-w-0 overflow-hidden" />
-            <div id="binary-view" className="binary-view absolute inset-0 grid min-h-0 grid-rows-[2.75rem_minmax(0,1fr)] bg-background" hidden>
+            <div id="editor-body" className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] overflow-hidden"><div className="relative grid min-h-0 min-w-0 overflow-hidden">
+            <div id="editor" className="min-h-0 min-w-0 overflow-hidden" />
+            <div id="rich-editor" className="rich-editor" hidden />
+
+            <div id="binary-view" className="binary-view absolute inset-x-0 bottom-0 top-0 grid min-h-0 grid-rows-[2.75rem_minmax(0,1fr)] bg-background" hidden>
               <div className="flex min-w-0 items-center justify-between border-b bg-muted/20 px-2.5"><div className="min-w-0"><strong id="binary-kind" className="text-xs">File preview</strong><span id="binary-status" className="ml-2 text-[10px] text-muted-foreground" /></div><div className="flex items-center"><IconButton id="file-preview-zoom-out" icon="zoom-out" title="Zoom out" /><IconButton id="file-preview-zoom-in" icon="zoom-in" title="Zoom in" /><Button id="binary-download" className={iconButton} variant="ghost" size="icon" title="Download file" asChild><a download><Icon name="download" /></a></Button></div></div>
               <div id="file-preview-viewport" className="relative min-h-0 min-w-0 overflow-auto bg-muted/40 p-4"><img id="image-preview" className="mx-auto block max-w-none shadow-sm" alt="" hidden /><div id="file-pdf-document" className="flex min-w-min flex-col items-center gap-4 [&_canvas]:block [&_canvas]:shrink-0 [&_canvas]:bg-white [&_canvas]:shadow-lg" hidden /><div id="binary-fallback" className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-sm text-muted-foreground"><Icon name="file" /><strong id="binary-name" /><Button id="binary-fallback-download" variant="outline" asChild><a download><Icon name="download" />Download</a></Button></div></div>
             </div>
@@ -183,8 +192,8 @@ export function AppShell() {
               </aside>
             </div>
           </section>
-          <div id="output-resize" role="separator" aria-label="Resize editor and output" aria-orientation="vertical" tabIndex={0} className="group flex w-2 touch-none cursor-col-resize items-center justify-center bg-muted/40 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary max-[760px]:hidden"><span className="h-8 w-0.5 rounded bg-border group-hover:bg-primary" /></div>
 
+          <div id="output-divider" className="pane-divider" role="separator" aria-label="Resize editor and PDF" aria-orientation="vertical" tabIndex={0} data-resize="output"><div className="divider-actions"><IconButton id="collapse-editor" icon="chevron-left" title="Hide source" /><IconButton id="collapse-output" icon="chevron-right" title="Hide PDF" /></div></div>
           <section id="output-pane" className="output-pane grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] bg-zinc-700 max-[760px]:hidden max-[760px]:[&.mobile-open]:fixed max-[760px]:[&.mobile-open]:inset-0 max-[760px]:[&.mobile-open]:z-30 max-[760px]:[&.mobile-open]:grid">
             <div className="pane-header output-header flex min-h-11 flex-wrap items-center justify-between border-b bg-muted px-2.5">
               <div className="flex min-w-0 items-center gap-1.5"><Button id="compile-button" className="h-8 w-28 shrink-0 px-3 text-xs" size="sm" type="button" title="Compile document"><Icon name="play" /><span>Compile</span></Button><div className="segmented grid w-32 grid-cols-2 rounded-md border bg-muted p-0.5" role="tablist"><Button className="active h-7 px-2 text-xs [&.active]:bg-background [&.active]:shadow-sm" variant="ghost" data-output="pdf">PDF</Button><Button className="h-7 px-2 text-xs [&.active]:bg-background [&.active]:shadow-sm" variant="ghost" data-output="log">Log <span id="log-error-count" className="text-red-700" hidden /></Button></div></div>
@@ -201,6 +210,7 @@ export function AppShell() {
         <div id="selection-actions" className="selection-actions fixed z-30" hidden><Button id="selection-accept" className="selection-accept h-8 shadow-lg" size="sm"><Icon name="check-check" /><span>Accept suggestion</span></Button></div>
       </div>
 
+      <SettingsDialogs />
       <div id="toast" className="toast fixed bottom-5 left-1/2 z-50 max-w-[calc(100%-1.5rem)] -translate-x-1/2 rounded-md bg-foreground px-3 py-2 text-sm text-background shadow-xl" role="status" hidden />
       <div id="pdf-context-menu" role="menu" aria-label="PDF actions" className="fixed z-40 w-44 rounded-md border bg-card p-1 text-card-foreground shadow-xl" hidden>
         <Button id="pdf-go-to-source" role="menuitem" variant="ghost" size="sm" className="w-full justify-start rounded-sm px-2 text-xs"><Icon name="file-check-2" />Go to source</Button>
@@ -215,9 +225,9 @@ export function AppShell() {
       </div>
       <dialog id="appearance-dialog" className={dialogClass}><div className="p-5"><DialogHeader title="Appearance" closeId="appearance-close" /><div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Color theme"><Button data-theme-option="system" variant="outline" type="button" role="radio" className="h-auto flex-col gap-2 py-3"><Icon name="monitor" />System</Button><Button data-theme-option="light" variant="outline" type="button" role="radio" className="h-auto flex-col gap-2 py-3"><Icon name="sun" />Light</Button><Button data-theme-option="dark" variant="outline" type="button" role="radio" className="h-auto flex-col gap-2 py-3"><Icon name="moon" />Dark</Button></div></div></dialog>
       <dialog id="search-dialog" className={cn(dialogClass, "w-[min(44rem,calc(100%-1.5rem))]")}><div className="p-5"><DialogHeader title="Search and replace" closeId="search-close" /><form id="search-form" className="flex flex-wrap items-center gap-2"><Input id="search-query" className="min-w-0 flex-1" aria-label="Search project" placeholder="Search project" maxLength={512} required /><Button type="submit" size="icon" title="Search"><Icon name="search" /></Button><div className="flex w-full gap-4 text-xs"><label className="flex items-center gap-2"><input id="search-case" type="checkbox" />Match case</label><label className="flex items-center gap-2"><input id="search-regex" type="checkbox" />Regular expression</label></div></form><div className="mt-3 flex flex-wrap gap-2"><Input id="replace-text" className="min-w-0 flex-1" aria-label="Replacement text" placeholder="Replacement text" /><select id="replace-scope" aria-label="Replace scope" className="h-9 rounded-md border bg-background px-2 text-xs"><option value="file">Current file</option><option value="project">Entire project</option></select><Button id="replace-preview" variant="outline" size="sm">Preview</Button><Button id="replace-apply" size="sm" hidden>Apply replacements</Button></div><p id="search-status" className="my-3 text-xs text-muted-foreground" role="status" /><div id="search-results" className="max-h-[55dvh] overflow-auto" /></div></dialog>
-      <dialog id="settings-dialog" className={dialogClass}>
+      <dialog id="project-settings-dialog" className={dialogClass}>
         <form id="settings-form" className="space-y-4 p-5">
-          <DialogHeader title="Project settings" closeId="settings-close" />
+          <DialogHeader title="Project settings" closeId="project-settings-close" />
           <label className="grid gap-1.5 text-sm" htmlFor="settings-main">Main document<select id="settings-main" className="h-9 min-w-0 rounded-md border bg-background px-3" /></label>
           <label className="grid gap-1.5 text-sm" htmlFor="settings-compiler">Compiler<select id="settings-compiler" className="h-9 rounded-md border bg-background px-3"><option value="auto">Automatic</option><option value="tectonic">Tectonic</option><option value="latexmk">latexmk</option></select></label>
           <label className="flex items-center gap-2 text-sm"><input id="settings-auto" type="checkbox" />Automatic compilation</label>

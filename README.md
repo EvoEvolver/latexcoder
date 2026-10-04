@@ -15,10 +15,10 @@
   <a href="https://railway.com/deploy/latexcoder?referralCode=4KUZ4o&amp;utm_medium=integration&amp;utm_source=template&amp;utm_campaign=generic"><img src="https://railway.com/button.svg" alt="Deploy on Railway"></a>
 </p>
 
-LaTeX Coder combines real-time collaborative editing, a built-in PDF and Log
-workflow, project Git repositories, and agent-safe editing APIs. The source tree
-remains ordinary files on disk. Yjs keeps browser sessions synchronized, SQLite
-stores application state, and every project is a real Git repository on `main`.
+LaTeX Coder combines real-time collaborative editing, integrated LaTeX
+compilation, and a first-class editing path for coding agents. Your paper
+stays ordinary files on disk, and every project is a real Git repository you
+can clone, push to, and back up like any other directory.
 
 ![LaTeX Coder workspace with files, source editing, and PDF preview](docs/images/workspace.png)
 
@@ -27,63 +27,62 @@ stores application state, and every project is a real Git repository on `main`.
 
 ## Why LaTeX Coder
 
+- **Hover to preview images and equations.** See a figure or rendered equation
+  by hovering over its reference, even when it is defined in another file.
+  Previews also work directly on `\includegraphics` paths and math expressions.
+- **Blame mode: see who wrote what.** Character-level authorship in the
+  editor, down to the Git checkpoint that introduced each range.
+- **Command-click to jump to a definition.** Follow citations to their BibTeX
+  entries and cross-references to their labels across the project
+  (`\cite`, `\citep`, `\citet`, `\ref`, `\eqref`, `\autoref`, `\cref`).
+  `\input`, `\include`, `\includegraphics`, and `\url` open their targets too.
+
 ### Write together
 
 - Edit simultaneously with live cursors and presence.
-- Share a project with a View or Edit capability link. Guests do not need an
-  account; signed-in recipients confirm before joining persistently as viewers
-  or collaborators.
-- Comment, reply, and suggest changes inline. Review data is encoded as LaTeX
-  macros, so an agent can read and edit it instead of interacting with an
-  opaque UI-only review layer.
-- Inspect character-level authorship in Blame mode, including the first Git
-  checkpoint containing each range.
+- Share a project with a view or edit link. Guests don't need an account.
+- Comment, reply, and suggest changes inline. Reviews live in the source as
+  LaTeX macros, so agents and Git can read them too — nothing is locked in a
+  UI-only database.
 
 ### Navigate the paper, not just its files
 
 - Browse an indented file tree with folders, drag-and-drop moves, downloads,
   recoverable deletion, image/PDF previews, and open-file tabs.
-- Edit Markdown beside LaTeX and switch to a sanitized GFM preview with project-relative
+- Edit Markdown beside LaTeX with a sanitized GFM preview: project-relative
   images, tables, task lists, code blocks, and links to other project files.
-- Use **Tree** for the section outline and **TreeWriter** for a paper-level view
-  of section titles, `\tldr`, and `\sectiontldr` summaries. Leaf source can be
-  edited in place with the same CodeMirror interactions as the main editor.
-- Command-click on macOS, or Ctrl-click elsewhere, to follow `\cite`, `\citep`,
-  `\citet`, `\ref`, `\autoref`, `\cref`, `\include`, `\includegraphics`, and
-  `\url` targets. Citation completion includes titles and authors.
-- Search the entire project, optionally with sandboxed ripgrep-compatible
-  regular expressions, and preview multi-file replacements before applying them.
+- Use **Tree** for the section outline and **TreeWriter** for a paper-level
+  view of section titles, `\tldr`, and `\sectiontldr` summaries, editable in
+  place.
+- Complete citation keys with titles and authors visible in the suggestions.
+- Search the whole project with optional regular expressions, and preview
+  multi-file replacements before applying them.
 
-### Compile and debug without leaving the editor
+### Preview as you write
 
-- Compile with Tectonic or an explicitly configured latexmk installation.
-- Switch between **PDF** and **Log** beside the editor. Log groups errors and
-  warnings, surfaces the first fatal error, and links diagnostics back to their
-  source file and line.
-- Navigate both ways with SyncTeX: source to PDF and PDF to centered source.
-- Fit the PDF to page width or a whole page, zoom it, download it, or switch
-  between Source and PDF on smaller screens.
-- Keep the last successful preview while editing; the UI marks it only when it
-  becomes stale.
+- Compile with Tectonic or latexmk. If neither is installed, a verified
+  Tectonic binary is set up automatically on first use.
+- Navigate both ways with SyncTeX: source to PDF and PDF back to source.
+- The last successful PDF stays on screen while you edit and is only flagged
+  when it goes stale.
 
 ### Give agents a first-class editing path
 
 Every collaborator can copy a project-specific **Agent editing** command from
-the Collaborate menu. It opens a plain-text manual containing the project's
-files and capability-bearing API URLs.
+the Collaborate menu. It hands the agent a plain-text manual containing the
+project's files and its API URLs.
 
-The default edit workflow is deliberately simple:
+The edit workflow is deliberately simple:
 
-1. Download a complete UTF-8 file and retain its `X-Content-SHA256` header.
+1. Download a file.
 2. Edit it with ordinary local tools.
-3. Upload the complete replacement with that hash as `X-Base-SHA256`.
+3. Upload the replacement together with the original content hash.
 
-The server calculates and applies the Yjs changes in one transaction. If a
-collaborator changed the file in the meantime, the upload is rejected with
-HTTP 409 rather than overwriting newer work. Agent access can apply changes
-directly or force every edit into reviewable suggestions. The same manual also
-documents project search, PDF and Log diagnostics, blame, reviews, and Git. It
-tells agents to use Git only when the user explicitly asks for it.
+The server applies the changes in one transaction; if a collaborator edited
+the file in the meantime, the upload is rejected instead of overwriting their
+work. Agent access can also be restricted so every edit arrives as a
+reviewable suggestion. The same manual covers project search, compilation,
+blame, reviews, and Git.
 
 <p align="center">
   <img src="docs/images/mobile-source-pdf.png" width="1000" alt="LaTeX Coder mobile source and PDF views side by side">
@@ -91,19 +90,19 @@ tells agents to use Git only when the user explicitly asks for it.
 
 ## LaTeX Coder vs. Overleaf
 
-LaTeX Coder is not intended to match Overleaf's hosting scale, template
-ecosystem, publisher integrations, or support organization. It takes a
-different approach for trusted teams that want to own their infrastructure and
-make coding agents part of the writing workflow.
+For teams considering an alternative to Overleaf, start with the
+[editor features above](#why-latex-coder). LaTeX Coder also gives teams control
+of their infrastructure and makes coding agents part of the writing workflow.
+The table below compares collaboration and integration choices.
 
 | | LaTeX Coder | Overleaf |
 | --- | --- | --- |
 | Hosting | Self-hosted Node service; persistent data stays on your volume. | Hosted service, with separate on-premises products. |
-| Guest collaboration | View/Edit capability links; an account is optional for project access. | Account-based collaboration with plan-dependent collaborator limits. |
+| Guest collaboration | View/Edit share links; an account is optional for project access. | Account-based collaboration with plan-dependent collaborator limits. |
 | Review data | Comments, replies, and suggestions are LaTeX macros visible to humans, agents, and Git. | Comments and Track Changes are platform-managed; Track Changes is a premium feature. |
-| Git model | Every project is a Git repository. Yjs represents `main`; incoming changes are merged before import. | Git Bridge translates Overleaf history into one linear branch named `master`; cloud Git integration is premium. |
+| Git model | Every project is a Git repository. The live documents represent `main`; incoming changes are merged before import. | Git Bridge translates Overleaf history into one linear branch named `master`; cloud Git integration is premium. |
 | Git and reviews | Macro-backed review state travels with source and is validated on import. | Overleaf advises against mixing active Git use with comments or Track Changes because pushes can displace or lose review metadata. |
-| Agent editing | Project-scoped plain-text manual, checked full-file edits, search, build/Log diagnostics, blame, review, and Git APIs. | General editor and integration workflows rather than this checked file-edit protocol. |
+| Agent editing | Project-scoped plain-text manual, checked full-file edits, search, compilation, blame, review, and Git APIs. | General editor and integration workflows rather than this checked file-edit protocol. |
 | Export | ZIP of the live working tree, including uncommitted source changes. | Source ZIP; the compiled PDF and most generated files are downloaded separately. |
 
 Comparison details are based on Overleaf's official documentation for
@@ -125,126 +124,14 @@ pnpm check
 LATEXCODER_ADMIN_PASSWORD='use-a-long-random-password' pnpm start
 ```
 
-Open <http://127.0.0.1:8090>. On an empty data directory, sign in as `admin`
-with `LATEXCODER_ADMIN_PASSWORD`. The password must contain at least 10
-characters and is used only to create the first account. Internal users can
-then issue registration links that expire after seven days, choosing whether
-the new account is Internal or External. Links are single-use by default and
-can optionally remain reusable until they expire. External users keep a full
-project dashboard and can create projects, but cannot invite more users.
+Open <http://127.0.0.1:8090> and sign in as `admin` with that password
+(10+ characters, used only to create the first account). You can then invite
+more users from the admin panel with registration links.
 
-For local development:
+## Deploy with Docker or Railway
 
-```sh
-LATEXCODER_ADMIN_PASSWORD='1234567890' pnpm dev
-```
-
-Vite serves the client at <http://127.0.0.1:5173> and proxies application,
-WebSocket, share, and Git traffic to the TypeScript server on port 8090.
-
-## Projects and access
-
-Only registered users have a project dashboard and can create projects. A
-project may have multiple registered collaborators; each collaborator sees it
-in their own dashboard and receives distinct Browser, Agent, and Git secrets.
-Projects support shared tags, title/tag search, tag filters, and per-user
-archiving. Project URLs use short generated IDs and do not change when a project
-is renamed.
-
-The bootstrap administrator has a paginated administration panel for all users
-and projects. It supports account search, password resets with session
-revocation, soft user deletion that preserves projects and attribution, and
-project deletion. Administrators can also switch active non-admin accounts
-between Internal and External. Regular members cannot access the panel or its
-APIs. Existing accounts are migrated as Internal users.
-
-Guests enter through `/share/<project-id>/<secret>`. The secret is exchanged for
-a 24-hour, project-scoped HttpOnly session before redirecting to the clean
-project URL. Signed-in users see a confirmation page before adding a project or
-upgrading View access to Edit access. Rotating a collaborator's secret
-invalidates that person's old Browser, Agent, and Git links without affecting
-other members.
-
-New projects can be created from ZIP archives. ZIP upload inside an existing
-project adds files without overwriting existing paths. Imports reject path
-traversal, Git metadata, and oversized archives.
-
-## Git and live collaboration
-
-Every project starts on `main`, and the collaborative Yjs documents always
-represent that branch. Browser edits are checkpointed after 30 seconds of
-inactivity, or at most every five minutes during continuous editing. Unchanged
-content does not create an empty commit.
-
-Clone, fetch, and pull first checkpoint the latest collaborative content, so a
-browser user does not need to push before a local Git client can see their work.
-Add a public key under **Account Settings → SSH keys**, then copy the default
-SSH command from **Collaborate → Git access**. Clone and push require the
-matching private key and project membership. Viewers can clone but cannot push.
-Removing a key revokes its SSH access.
-
-```sh
-git clone ssh://git@your-host:2222/<project-id>.git
-cd <project-id>
-# edit and commit normally
-git push origin main
-```
-
-The **Access link** option retains the existing HTTPS remote at
-`https://your-host/git/<project-id>/<personal-secret>`, which works without an
-SSH key. SSH keys are managed separately from project access-link secrets.
-The server's SSH host key is generated on first startup and persisted in the
-state directory; its fingerprint is shown in the Git dialog.
-
-On push, LaTeX Coder checkpoints current Yjs state, merges the incoming commit
-in a temporary worktree, validates the result, and imports a clean merge into
-the live documents. If it cannot merge safely, the incoming work is retained on
-`conflict/<UTC timestamp>` while `main` and Yjs remain unchanged.
-
-The History view provides paginated checkpoints, per-file diffs, an Agent edits
-filter, and whole-project or single-file restore. A restore creates a new commit
-instead of rewriting history.
-
-## Compilation and Log
-
-Project settings select the main TeX file, compiler, and optional automatic
-compilation. In `auto` mode the server uses `LATEXCODER_LATEX_BIN`, Tectonic, or
-latexmk. If neither compiler is present, it installs a local verified Tectonic
-binary on first use. Selecting latexmk explicitly requires latexmk to be
-installed already.
-
-The Log view separates parsed diagnostics from the full compiler output. Errors
-and warnings are grouped into scannable items; source-aware items jump directly
-to the relevant file and line. The first fatal error is promoted so it can be
-found without searching the raw transcript.
-
-PDF navigation requires the `synctex` executable. The Docker image includes it.
-Compile an older project once after deployment to generate its synchronization
-data.
-
-Choose **Top-level root** or **Chapter root** beside Compile to build the whole
-document or just the chapter you are working on, including its child files.
-If no chapter root is declared or its file is missing, compilation automatically
-falls back to the top-level root.
-
-Keep chapter configuration in the project source: a child file declares
-`%% latexcoder:chapter-root chapters/methods.tex`, and the chapter entry declares
-`%% latexcoder:template templates/chapter.tex`. The template supplies the document
-class, packages, and surrounding content, with `%% latexcoder:content` marking
-where the chapter is inserted. An optional `%% latexcoder:root main.tex` selects
-the top-level entry. Paths are relative to the project root, and chapter builds
-keep their own PDF, log, and source-navigation data. See the
-[chapter compilation guide](docs/chapter-compilation.md) for a complete example.
-
-The Agent PDF endpoint always represents current source. It compiles when
-needed and reuses the cached artifact otherwise. A failed current build returns
-HTTP 422 JSON with the compiler log, structured diagnostics, and the first fatal
-error; it never silently gives an agent a stale PDF as evidence of success.
-
-## Docker and Railway
-
-The image includes Tectonic, SyncTeX, Git, ripgrep, and bubblewrap. It stores all
-persistent state beneath `/data` but deliberately declares no Docker `VOLUME`.
+The image includes Tectonic, SyncTeX, Git, ripgrep, and bubblewrap, and stores
+all persistent state beneath `/data`.
 
 ```sh
 docker build -t latexcoder .
@@ -259,15 +146,18 @@ docker run --rm \
   latexcoder
 ```
 
-The seccomp override permits bubblewrap to create the namespaces used by regex
-search. It is unnecessary when sandboxed ripgrep search is not used.
+The seccomp override lets bubblewrap create the namespaces used by sandboxed
+regex search; skip it if you only need literal search.
 
-For Railway, use the deploy button above, attach a persistent volume at `/data`,
-and set `LATEXCODER_ADMIN_PASSWORD`. Railway's injected `PORT` is accepted
-automatically; no custom start command is required.
+For Railway, use the deploy button above, attach a persistent volume at
+`/data`, and set `LATEXCODER_ADMIN_PASSWORD`. Railway's injected `PORT` is
+picked up automatically — no custom start command needed. For SSH Git, expose
+TCP port `2222` and set `LATEXCODER_SSH_PUBLIC_HOST` and
+`LATEXCODER_SSH_PUBLIC_PORT` to the externally reachable TCP address. An HTTP
+proxy alone does not forward SSH.
 
-For SSH Git, add a **Settings → Networking → TCP Proxy** targeting port `2222`.
-Keep the existing HTTPS domain for the web app. If Railway assigns
+In Railway's **Settings → Networking → TCP Proxy**, set the target port to
+`2222`. Keep the existing HTTPS domain for the web app. If Railway assigns
 `shuttle.proxy.rlwy.net:15140`, for example, configure:
 
 ```env
@@ -286,6 +176,82 @@ Keep the HTTPS domain target port at `8080`; HTTP and SSH must use different
 internal ports. Replace the example hostname and public port with your assigned
 TCP proxy address, then redeploy. The Git menu uses these values for SSH clone commands;
 the existing HTTPS access links remain available under **Access link**.
+
+## Accounts and sharing
+
+Signed-in users get a project dashboard with tags, search, and archiving.
+Invite links create either Internal accounts, which can invite further users,
+or External accounts, which can create projects but not invite anyone. Guests
+join a single project through a share link, no account required.
+
+Each collaborator gets their own browser, agent, and Git credentials.
+Rotating a collaborator's link credentials revokes their previous links without
+affecting anyone else. SSH keys are managed separately in Account Settings.
+The admin panel covers user search, password resets,
+account deletion that preserves projects and attribution, and project
+deletion.
+
+Projects can be created from ZIP archives, and uploading a ZIP inside an
+existing project adds files without overwriting existing ones.
+
+## Git
+
+Every project lives on `main`, and the live collaborative documents always
+represent that branch. Browser edits are checkpointed automatically, so a
+`git pull` in another tool always sees the latest state — nobody has to
+"push" from the editor.
+
+Add your SSH public key under **Account Settings → SSH keys**, then copy the
+SSH command from **Collaborate → Git access**. SSH is selected by default;
+clone and push require the matching private key and project membership. Viewers
+can clone but cannot push. Removing a key revokes its SSH access.
+
+```sh
+git clone ssh://git@your-host:2222/<project-id>.git
+cd <project-id>
+# edit and commit normally
+git push origin main
+```
+
+The **Access link** option retains the existing HTTPS remote at
+`https://your-host/git/<project-id>/<personal-secret>`. It works without an SSH
+key; anyone holding the link can use it.
+
+The SSH host key is generated on first startup and persisted in the state
+directory. The Git dialog shows its fingerprint for the first connection.
+
+Pushes are merged into the live documents automatically. If a push cannot be
+merged safely, it is kept on a `conflict/<timestamp>` branch while `main` and
+the live documents stay untouched.
+
+The History view provides paginated checkpoints, per-file diffs, an Agent
+edits filter, and whole-project or single-file restore. Restores are new
+commits — history is never rewritten.
+
+## Compilation
+
+Project settings select the main TeX file, the compiler, and optional
+automatic compilation. The Log view groups errors and warnings, highlights the
+first fatal error, and links each diagnostic to its source file and line
+alongside the full compiler output.
+
+PDF navigation needs the `synctex` executable (included in the Docker image).
+Compile an older project once after deployment to generate its synchronization
+data.
+
+Choose **Top-level root** or **Chapter root** beside Compile to build the whole
+document or just the chapter you are working on, including its child files.
+If no chapter root is declared or its file is missing, compilation automatically
+falls back to the top-level root.
+
+Keep chapter configuration in the project source: a child file declares
+`%% latexcoder:chapter-root chapters/methods.tex`, and the chapter entry declares
+`%% latexcoder:template templates/chapter.tex`. The template supplies the document
+class, packages, and surrounding content, with `%% latexcoder:content` marking
+where the chapter is inserted. An optional `%% latexcoder:root main.tex` selects
+the top-level entry. Paths are relative to the project root, and chapter builds
+keep their own PDF, log, and source-navigation data. See the
+[chapter compilation guide](docs/chapter-compilation.md) for a complete example.
 
 ## Configuration
 
@@ -306,11 +272,11 @@ the existing HTTPS access links remain available under **Access link**.
 | `LATEXCODER_BWRAP_BIN` | `bwrap` | bubblewrap executable used to sandbox ripgrep. |
 | `LATEXCODER_SYNCTEX_BIN` | `synctex` | SyncTeX executable used for source/PDF navigation. |
 
-`GET /health/live` is the liveness probe. `GET /health/ready` reports the
-SQLite schema version, compile queue, and detected external tools. Missing
-optional tools are reported without making the editor itself unready.
+`GET /health/live` is the liveness probe. `GET /health/ready` additionally
+reports detected external tools; missing optional tools are reported without
+making the editor itself unready.
 
-## Data model
+## Where your data lives
 
 ```text
 <state-dir>/
@@ -320,37 +286,32 @@ optional tools are reported without making the editor itself unready.
     build/          current compilation artifacts
 ```
 
-SQLite is authoritative for users, invitations, sessions, membership, sharing,
-project settings, build state, trash, and Yjs snapshots. Source files and each
-project's Git repository remain directly accessible on disk.
-
-The codebase is TypeScript throughout:
-
-- `src/client` contains the React/Vite interface and browser controllers.
-- `src/server` contains HTTP routes, Git/Yjs coordination, persistence,
-  compilation, and bounded external processes.
-- `src/shared` contains schemas, parsers, review macros, diagnostics, and source
-  mapping used across environments.
-
-Run the complete validation suite with:
-
-```sh
-pnpm check
-pnpm test
-```
+SQLite stores accounts, sessions, and project settings. Papers stay as plain
+files with real Git repositories, so backups are an ordinary file copy.
 
 ## Security model
 
 LaTeX Coder is designed for trusted teams, not hostile multi-tenant workloads.
-Passwords are scrypt-hashed; invitations and capability URLs use high-entropy
-tokens; sessions and access records persist in SQLite. Anyone holding an Edit,
-Agent, or Git capability can modify that project within the capability's scope.
+Passwords are scrypt-hashed and share/invite links use high-entropy tokens.
+Anyone holding an Edit, Agent, or Git link can modify that project within the
+link's scope.
 
-Regex search runs through ripgrep in a read-only bubblewrap sandbox with no
-network, a 15-second timeout, and a 4 MiB output limit. Literal search also
-works on macOS without bubblewrap. LaTeX compilation itself is **not** a
-security sandbox. Do not compile untrusted projects or store unrelated secrets
-inside project directories.
+Regex search runs through ripgrep in a read-only bubblewrap sandbox (no
+network, 15-second timeout, 4 MiB output limit); literal search works without
+it. LaTeX compilation is **not** sandboxed — do not compile untrusted
+projects, and do not store unrelated secrets inside project directories.
+
+## Development
+
+TypeScript throughout: `src/client` is the React/Vite interface, `src/server`
+handles HTTP, Git/Yjs coordination, persistence, and compilation, and
+`src/shared` holds the schemas and parsers used by both.
+
+```sh
+LATEXCODER_ADMIN_PASSWORD='1234567890' pnpm dev   # Vite on 5173 → app server on 8090
+pnpm check                                        # build + typecheck
+pnpm test                                         # full test suite
+```
 
 ## License
 

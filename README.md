@@ -131,14 +131,15 @@ more users from the admin panel with registration links.
 ## Deploy with Docker or Railway
 
 The image includes Tectonic, SyncTeX, Git, ripgrep, and bubblewrap, and stores
-all persistent state beneath `/data`.
+all persistent state beneath `/data`. Container HTTP defaults to `8080`;
+the example below maps it to `8090` on your machine. SSH uses `2222`.
 
 ```sh
 docker build -t latexcoder .
 docker volume create latexcoder-data
 docker run --rm \
   --name latexcoder \
-  --publish 8090:8090 \
+  --publish 8090:8080 \
   --publish 2222:2222 \
   --security-opt seccomp=unconfined \
   --env LATEXCODER_ADMIN_PASSWORD='use-a-long-random-password' \
@@ -150,8 +151,9 @@ The seccomp override lets bubblewrap create the namespaces used by sandboxed
 regex search; skip it if you only need literal search.
 
 For Railway, use the deploy button above, attach a persistent volume at
-`/data`, and set `LATEXCODER_ADMIN_PASSWORD`. Railway's injected `PORT` is
-picked up automatically — no custom start command needed. For SSH Git, expose
+`/data`, and set `LATEXCODER_ADMIN_PASSWORD`. Set the HTTP domain target port
+and `PORT` to `8080`; no custom start command is needed. The image advertises
+only the HTTP port so automatic port detection does not select SSH. For SSH Git, expose
 TCP port `2222` and set `LATEXCODER_SSH_PUBLIC_HOST` and
 `LATEXCODER_SSH_PUBLIC_PORT` to the externally reachable TCP address. An HTTP
 proxy alone does not forward SSH.
@@ -260,7 +262,7 @@ keep their own PDF, log, and source-navigation data. See the
 | `LATEXCODER_ADMIN_PASSWORD` | none | Creates the initial `admin` account on an empty database. |
 | `LATEXCODER_STATE_DIR` | `.latexcoder` | SQLite database, projects, Git repositories, Yjs snapshots, build cache, and PDFs. |
 | `LATEXCODER_HOST` | `0.0.0.0` | Listener address. |
-| `LATEXCODER_PORT` | `PORT` or `8090` | HTTP listener port. |
+| `LATEXCODER_PORT` | `PORT` or `8090` | HTTP listener port. The Docker image sets `PORT=8080`. |
 | `LATEXCODER_SSH_PORT` | `2222` | SSH Git listener port; enabled only with a valid public host and port. |
 | `LATEXCODER_SSH_HOST` | `0.0.0.0` | SSH listener address. |
 | `LATEXCODER_SSH_PUBLIC_HOST` | `RAILWAY_TCP_PROXY_DOMAIN` | Public hostname for SSH Git; explicit configuration overrides the Railway fallback. |

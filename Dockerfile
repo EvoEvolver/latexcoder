@@ -37,12 +37,15 @@ COPY package.json ./
 COPY src ./src
 
 ENV NODE_ENV=production \
+  PORT=8080 \
   LATEXCODER_HOST=0.0.0.0 \
   LATEXCODER_STATE_DIR=/data
 
 RUN mkdir -p /data
 
-EXPOSE 8090 2222
+# Advertise only HTTP for platform port detection. SSH is published explicitly
+# with Docker -p or a Railway TCP proxy; it does not require EXPOSE.
+EXPOSE 8080
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["./node_modules/.bin/tsx", "src/server/main.ts"]

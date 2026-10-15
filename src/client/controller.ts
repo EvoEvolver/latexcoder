@@ -90,6 +90,7 @@ import { diffLines } from "diff";
 import * as Y from "yjs";
 
 import { parseReviews, stripReviewStorage, type ReviewItem } from "../shared/review.ts";
+import { mapCommentEdit } from "./comment-edits.ts";
 import { referenceDefinition, type ReferenceLink } from "../shared/references.ts";
 import { normalizeProjectPath, resolveGraphicsPath } from "../shared/assets.ts";
 import { buildDiagnostics, compileErrors } from "../shared/compile-errors.ts";
@@ -1488,10 +1489,14 @@ const protectReviewStorage = EditorState.transactionFilter.of(transaction => {
 
   const reviews = parseReviews(transaction.startState.doc.toString());
   if (state.suggesting) return trackedSuggestion(transaction, reviews);
+  const mapped = mapCommentEdit(transaction, reviews);
   let blocked = false;
-  transaction.changes.iterChanges((from, to, _newFrom, _newTo, inserted) => {
+  transaction.changes.iterChanges((_from, _to, _newFrom, _newTo, inserted) => {
     if (/\\(?:cmtbg|cmted|cmtrpl|revbg|reved|addbg|added|delbg|deled)\b/.test(inserted.toString())) blocked = true;
+  });
+  (mapped?.changes ?? transaction.changes).iterChanges((from, to) => {
     for (const item of reviews) {
+      if (mapped && item.kind === "comment") continue;
       for (const range of [
         { from: item.from, to: item.bodyFrom },
         { from: item.bodyTo, to: item.to },
@@ -1504,7 +1509,9 @@ const protectReviewStorage = EditorState.transactionFilter.of(transaction => {
       }
     }
   });
-  if (!blocked) return transaction;
+  if (!blocked) return mapped
+    ? [transaction, { changes: mapped.correction, selection: mapped.selection, sequential: true }]
+    : transaction;
   queueMicrotask(() => showToast(t("Use Review actions to change comments and suggestions.")));
   return [];
 });

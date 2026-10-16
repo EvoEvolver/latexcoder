@@ -11,8 +11,44 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
 
+# A complete upstream TeX Live, matching what authors run locally, so
+# documents do not fail on whichever package or font a distribution split
+# left out. Documentation and sources are skipped to keep the image smaller.
+# It lives in its own stage so changes to the runtime layers never invalidate
+# this multi-gigabyte layer. Override TEXLIVE_REPOSITORY to pin a mirror.
+FROM node:22-trixie-slim AS texlive
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates curl perl xz-utils \
+  && rm -rf /var/lib/apt/lists/*
+
+# The architecture-specific bin directory gets a stable name for PATH.
+ARG TEXLIVE_REPOSITORY=https://mirror.ctan.org/systems/texlive/tlnet
+RUN mkdir /tmp/install-tl \
+  && curl -fsSL "${TEXLIVE_REPOSITORY}/install-tl-unx.tar.gz" | tar -xz --strip-components=1 -C /tmp/install-tl \
+  && printf '%s\n' \
+    'selected_scheme scheme-full' \
+    'TEXDIR /usr/local/texlive' \
+    'TEXMFLOCAL /usr/local/texlive/texmf-local' \
+    'TEXMFSYSCONFIG /usr/local/texlive/texmf-config' \
+    'TEXMFSYSVAR /usr/local/texlive/texmf-var' \
+    'instopt_adjustpath 0' \
+    'instopt_adjustrepo 1' \
+    'instopt_letter 0' \
+    'instopt_write18_restricted 1' \
+    'tlpdbopt_autobackup 0' \
+    'tlpdbopt_install_docfiles 0' \
+    'tlpdbopt_install_srcfiles 0' \
+    > /tmp/install-tl/texlive.profile \
+  && /tmp/install-tl/install-tl --no-interaction --profile /tmp/install-tl/texlive.profile --repository "${TEXLIVE_REPOSITORY}" \
+  && rm -rf /tmp/install-tl \
+  && ln -s "$(find /usr/local/texlive/bin -mindepth 1 -maxdepth 1 -type d -name '*-linux' | head -1)" /usr/local/texlive/bin/linux \
+  && /usr/local/texlive/bin/linux/pdflatex --version >/dev/null
+
 FROM node:22-trixie-slim AS runtime
 
+# perl runs latexmk and other TeX Live scripts; ghostscript converts EPS
+# figures; fontconfig lets XeLaTeX and LuaLaTeX find installed fonts.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     bubblewrap \
@@ -24,37 +60,11 @@ RUN apt-get update \
     perl \
     ripgrep \
     tini \
-    xz-utils \
   && rm -rf /var/lib/apt/lists/*
 
-# A complete upstream TeX Live, matching what authors run locally, so
-# documents do not fail on whichever package or font a distribution split
-# left out. Documentation and sources are skipped to keep the image smaller.
-# Override TEXLIVE_REPOSITORY to pin a mirror when the CTAN redirector is slow.
-ARG TEXLIVE_REPOSITORY=https://mirror.ctan.org/systems/texlive/tlnet
-RUN mkdir /tmp/install-tl \
-  && curl -fsSL "${TEXLIVE_REPOSITORY}/install-tl-unx.tar.gz" | tar -xz --strip-components=1 -C /tmp/install-tl \
-  && printf '%s\n' \
-    'selected_scheme scheme-full' \
-    'TEXDIR /usr/local/texlive' \
-    'TEXMFLOCAL /usr/local/texlive/texmf-local' \
-    'TEXMFSYSCONFIG /usr/local/texlive/texmf-config' \
-    'TEXMFSYSVAR /usr/local/texlive/texmf-var' \
-    'instopt_adjustpath 1' \
-    'instopt_adjustrepo 1' \
-    'instopt_letter 0' \
-    'instopt_write18_restricted 1' \
-    'tlpdbopt_autobackup 0' \
-    'tlpdbopt_install_docfiles 0' \
-    'tlpdbopt_install_srcfiles 0' \
-    'tlpdbopt_sys_bin /usr/local/bin' \
-    'tlpdbopt_sys_info /usr/local/share/info' \
-    'tlpdbopt_sys_man /usr/local/share/man' \
-    > /tmp/install-tl/texlive.profile \
-  && /tmp/install-tl/install-tl --no-interaction --profile /tmp/install-tl/texlive.profile --repository "${TEXLIVE_REPOSITORY}" \
-  && rm -rf /tmp/install-tl \
-  && pdflatex --version | head -1 \
-  && latexmk -v | head -2
+COPY --from=texlive /usr/local/texlive /usr/local/texlive
+ENV PATH=/usr/local/texlive/bin/linux:$PATH
+RUN pdflatex --version >/dev/null && latexmk -v >/dev/null && command -v synctex xelatex lualatex biber >/dev/null
 
 WORKDIR /app
 

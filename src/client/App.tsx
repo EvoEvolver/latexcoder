@@ -415,6 +415,7 @@ export function AppShell() {
           <Button id="git-mode-link" variant="ghost" role="radio" aria-checked="false" className="[&.active]:bg-background"><Message id="Access link" /></Button>
         </div></Localized>
         <p id="git-access-description" className="text-xs text-muted-foreground" />
+        <p id="git-empty-hint" hidden className="text-xs text-muted-foreground" />
         <Localized label="Copy"><CopyRow inputId="clone-command" buttonId="copy-clone-command" label="Copy" /></Localized>
         <p id="git-host-fingerprint" hidden className="break-all font-mono text-xs text-muted-foreground" />
         <Button id="git-manage-keys" hidden variant="outline" size="sm"><Message id="Manage SSH keys" /></Button>

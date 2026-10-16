@@ -73,7 +73,7 @@ export interface ProjectRouteContext {
   assertProjectWritable(runtime: ProjectRuntime): void;
   cleanProjectName(value: unknown): string;
   cleanProjectTags(tags: string[]): string[];
-  createProject(name: unknown, ownerUsername: string | null, importedFiles?: Array<{ relativePath: string; content: Uint8Array }>): Promise<ProjectRuntime>;
+  createProject(name: unknown, ownerUsername: string | null, importedFiles?: Array<{ relativePath: string; content: Uint8Array }>, empty?: boolean): Promise<ProjectRuntime>;
   database: StateDatabase;
   deleteProject(runtime: ProjectRuntime): Promise<{ defaultProjectId: string | null }>;
   isProjectOwner(request: Request, runtime: ProjectRuntime): boolean;

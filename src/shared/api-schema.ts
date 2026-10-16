@@ -22,8 +22,8 @@ export const createInvitationRequestSchema = z.strictObject({
 export const updateProfileRequestSchema = z.strictObject({ displayName: z.string().trim().min(1).max(80) });
 export const passwordResetRequestSchema = z.strictObject({ token: z.string().min(1), password: passwordSchema });
 export const adminUpdateUserTypeRequestSchema = z.strictObject({ userType: userTypeSchema });
-export const createProjectRequestSchema = z.strictObject({ name: projectNameSchema });
-export const updateProjectRequestSchema = createProjectRequestSchema;
+export const createProjectRequestSchema = z.strictObject({ name: projectNameSchema, empty: z.boolean().default(false) });
+export const updateProjectRequestSchema = z.strictObject({ name: projectNameSchema });
 export const projectTagsRequestSchema = z.strictObject({
   tags: z.array(z.string().trim().min(1).max(32).regex(/^[^,\r\n]+$/)).max(12),
 });
@@ -53,6 +53,7 @@ export const projectSummarySchema = z.object({
   tags: z.array(z.string()).default([]),
   archived: z.boolean().default(false),
   permissions: z.object({ manage: z.boolean().optional(), edit: z.boolean().optional(), collaborate: z.boolean().optional() }).optional(),
+  git: z.object({ awaitingPush: z.boolean().optional() }).optional(),
 });
 export const apiErrorSchema = z.object({ error: z.object({ code: z.string(), message: z.string(), details: z.record(z.string(), z.unknown()).optional() }) });
 export const blameRunSchema = z.object({

@@ -13,7 +13,7 @@ export type ProjectMetadata = {
   membershipRole?: string;
   membershipArchived?: boolean;
   tags?: string[];
-  git?: { conflict?: { branch: string; incoming: string; base: string; createdAt: string }; [key: string]: unknown };
+  git?: { awaitingPush?: boolean; conflict?: { branch: string; incoming: string; base: string; createdAt: string }; [key: string]: unknown };
 };
 
 export type BuildMetadata = {

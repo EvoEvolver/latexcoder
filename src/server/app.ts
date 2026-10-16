@@ -111,6 +111,17 @@ async function ensureGitRepository(projectDir: string): Promise<void> {
   if (branch !== "main") throw apiError("git_branch_invalid", "the collaborative working tree must remain on main", 409);
 }
 
+// Empty projects created for an existing repository advertise no refs until the
+// first push arrives, so an unrelated history can be pushed without a merge.
+// The marker clears as soon as the project gains a history of its own.
+function clearAwaitingPush(runtime: ProjectRuntime): void {
+  if (!runtime.metadata.git?.awaitingPush) return;
+  const gitState = { ...runtime.metadata.git };
+  delete gitState.awaitingPush;
+  runtime.metadata = { ...runtime.metadata, git: gitState };
+  runtime.database.saveProject(runtime.metadata);
+}
+
 function cleanCommitMessage(value: unknown, fallback = "Collaborative checkpoint"): string {
   const message = typeof value === "string" ? value.replace(/\r/g, "").trim() : "";
   if (message.length > 500) throw apiError("invalid_commit_message", "commit message must not exceed 500 characters");
@@ -141,7 +152,10 @@ async function gitCheckpoint(runtime: ProjectRuntime, message: unknown, metadata
   const created = changed.code === 1 || mainChanged || foldersChanged;
   if (created) await git(runtime.projectDir, ["commit", "--allow-empty", "-m", versionMessage(cleanCommitMessage(message), { ...(metadata ?? { kind: "checkpoint", main: runtime.build.main }), folders })]);
   const commit = await gitHead(runtime.projectDir);
-  if (created) runtime.database.assignBlameChanges(runtime.id, blameChanges, commit);
+  if (created) {
+    runtime.database.assignBlameChanges(runtime.id, blameChanges, commit);
+    clearAwaitingPush(runtime);
+  }
   return { commit, created };
 }
 
@@ -227,10 +241,11 @@ async function importGitWorktree(
   validateReviews = true,
   blameCommit: string | null = null,
   blameActor: BlameActor = { id: "git", name: "Git import" },
+  requireMain = true,
 ): Promise<void> {
   const before = new Set(await trackedPaths(runtime.projectDir));
   const after = new Set(await trackedPaths(sourceDir));
-  if (!after.has(main)) throw apiError("git_main_missing", "the incoming version deletes the main document", 409);
+  if (requireMain && !after.has(main)) throw apiError("git_main_missing", "the incoming version deletes the main document", 409);
 
   // Validate the complete target tree before changing any live Yjs document.
   for (const relativePath of after) {
@@ -341,6 +356,19 @@ async function withTemporaryWorktree<T>(runtime: ProjectRuntime, commit: string,
   }
 }
 
+// The pushed repository decides its own entry point: keep the configured main
+// document when it exists, otherwise prefer main.tex and fall back to the first
+// .tex file in the tree. A repository without any .tex file keeps the default
+// and the project opens without a main document until one is chosen.
+async function incomingMainDocument(runtime: ProjectRuntime, commit: string): Promise<string> {
+  const output = (await git(runtime.projectDir, ["ls-tree", "-r", "--name-only", "-z", commit])).output;
+  const files = output ? output.split("\0").filter(Boolean) : [];
+  if (files.includes(runtime.build.main)) return runtime.build.main;
+  return files.find(file => file === "main.tex")
+    || files.filter(file => file.endsWith(".tex")).sort((left, right) => left.split("/").length - right.split("/").length || left.localeCompare(right))[0]
+    || runtime.build.main;
+}
+
 async function gitSyncLocked(runtime: ProjectRuntime, requestedRef: string, blameActor?: BlameActor) {
     await ensureGitRepository(runtime.projectDir);
     const checkpoint = await gitCheckpoint(runtime, "Checkpoint before sync");
@@ -358,10 +386,20 @@ async function gitSyncLocked(runtime: ProjectRuntime, requestedRef: string, blam
     const incoming = await gitHead(runtime.projectDir, incomingRef);
     if (incoming === local) return { status: "up_to_date", commit: local };
 
-    const incomingIsAncestor = await git(runtime.projectDir, ["merge-base", "--is-ancestor", incoming, local], { allowedCodes: [0, 1] });
-    if (incomingIsAncestor.code === 0) return { status: "local_ahead", commit: local, incoming };
+    // An empty project adopts the incoming history wholesale: it has nothing of
+    // its own to merge, and the pushed repository keeps the history it arrived
+    // with. The checkpoint above clears the marker once the project is no
+    // longer empty, so later pushes take the ordinary merge path.
+    const adopting = Boolean(runtime.metadata.git?.awaitingPush);
+    const adoptedMain = adopting ? await incomingMainDocument(runtime, incoming) : runtime.build.main;
 
-    const localIsAncestor = await git(runtime.projectDir, ["merge-base", "--is-ancestor", local, incoming], { allowedCodes: [0, 1] });
+    if (!adopting) {
+      const incomingIsAncestor = await git(runtime.projectDir, ["merge-base", "--is-ancestor", incoming, local], { allowedCodes: [0, 1] });
+      if (incomingIsAncestor.code === 0) return { status: "local_ahead", commit: local, incoming };
+    }
+
+    const localIsAncestor = adopting ? { code: 0 }
+      : await git(runtime.projectDir, ["merge-base", "--is-ancestor", local, incoming], { allowedCodes: [0, 1] });
     let mergedCommit = incoming;
     let mergeConflict = false;
     let semanticConflict: Error | null = null;
@@ -376,7 +414,7 @@ async function gitSyncLocked(runtime: ProjectRuntime, requestedRef: string, blam
         mergedCommit = await gitHead(worktree);
       }
       try {
-        await importGitWorktree(runtime, worktree, runtime.build.main, true, mergedCommit, blameActor);
+        await importGitWorktree(runtime, worktree, adoptedMain, true, mergedCommit, blameActor, !adopting);
       } catch (error) {
         semanticConflict = error instanceof Error ? error : new Error(String(error));
       }
@@ -395,6 +433,12 @@ async function gitSyncLocked(runtime: ProjectRuntime, requestedRef: string, blam
 
     await git(runtime.projectDir, ["update-ref", "refs/heads/main", mergedCommit, local]);
     await git(runtime.projectDir, ["read-tree", mergedCommit]);
+    if (adopting) {
+      runtime.build.main = adoptedMain;
+      runtime.database.saveBuild(runtime.id, runtime.build);
+      clearAwaitingPush(runtime);
+      return { status: "adopted", commit: mergedCommit, incoming };
+    }
     return { status: localIsAncestor.code === 0 ? "fast_forward" : "merged", commit: mergedCommit, incoming };
 }
 
@@ -458,11 +502,24 @@ async function prepareGitPull(runtime: ProjectRuntime): Promise<{ commit: string
   return gitCheckpoint(runtime, "Automatic checkpoint before Git pull");
 }
 
-async function syncGitIngress(runtime: ProjectRuntime): Promise<{ ingressDir: string; head: string }> {
+async function syncGitIngress(runtime: ProjectRuntime): Promise<{ ingressDir: string; head: string | null }> {
   const ingressDir = path.join(runtime.projectRoot, "receive.git");
   if (!existsSync(ingressDir)) await git(runtime.projectDir, ["init", "--bare", ingressDir]);
-  const head = await gitHead(runtime.projectDir);
   await git(ingressDir, ["symbolic-ref", "HEAD", "refs/heads/main"]);
+  // Only main crosses into the project, so a branch or tag pushed by mistake
+  // must not linger and make the next push look already up to date.
+  const refs = (await git(ingressDir, ["for-each-ref", "--format=%(refname)"])).output;
+  for (const ref of refs ? refs.split("\n") : []) {
+    if (ref !== "refs/heads/main") await git(ingressDir, ["update-ref", "-d", ref], { allowedCodes: [0, 1] });
+  }
+  // An empty project advertises no refs so that a repository with an unrelated
+  // history pushes as an ordinary branch creation instead of being rejected as
+  // a non-fast-forward.
+  if (runtime.metadata.git?.awaitingPush) {
+    await git(ingressDir, ["update-ref", "-d", "refs/heads/main"], { allowedCodes: [0, 1] });
+    return { ingressDir, head: null };
+  }
+  const head = await gitHead(runtime.projectDir);
   await git(ingressDir, ["fetch", "--no-tags", runtime.projectDir, `+${head}:refs/heads/main`]);
   return { ingressDir, head };
 }
@@ -481,8 +538,9 @@ async function gitReceivePack(runtime: ProjectRuntime, args: string[], input: Ui
     : await runBinary("git", receiveArgs, { cwd: ingressDir, env }, input);
   if (args.includes("--advertise-refs")) return { output, sync: null };
 
-  const incoming = await gitHead(ingressDir, "refs/heads/main");
-  if (incoming === before) return { output, sync: null };
+  const received = await git(ingressDir, ["rev-parse", "--verify", "--quiet", "refs/heads/main^{commit}"], { allowedCodes: [0, 1] });
+  const incoming = received.code === 0 ? received.output.split("\n").at(-1)! : null;
+  if (!incoming || incoming === before) return { output, sync: null };
   const incomingRef = `refs/latexcoder/incoming/${randomUUID()}`;
   try {
     await git(runtime.projectDir, ["fetch", "--no-tags", ingressDir, `+refs/heads/main:${incomingRef}`]);
@@ -510,6 +568,9 @@ registration link; it is single-use by default, or reusable when sent
 Member authentication is required for \`GET /v1/projects\` and project creation.
 The list contains projects owned by or shared with the current member.
 \`POST /v1/projects\` with \`{"name":"My paper"}\` creates an owned project.
+Adding \`"empty":true\` creates it without a starter document: the project
+advertises an empty Git remote until the first push, so an existing repository
+can be pushed in with its own history intact.
 Only its owner can rename or delete it. Rename or delete one with
 \`PATCH /v1/projects/:id\` and \`DELETE /v1/projects/:id\`. Project summaries
 include shared \`tags\` and the current member's personal \`archived\` state.
@@ -1036,7 +1097,9 @@ export async function createPaperServer(options: ServerOptions = {}): Promise<Pa
     await mkdir(projectDir, { recursive: true });
     await mkdir(buildDir, { recursive: true });
     const mainPath = path.join(projectDir, "main.tex");
-    if (!(await listFiles(projectDir)).length) await writeFile(mainPath, DEFAULT_DOCUMENT, "utf8");
+    // A project waiting for its first Git push must stay empty: a starter
+    // document would become a history the pushed repository cannot extend.
+    if (!metadata.git?.awaitingPush && !(await listFiles(projectDir)).length) await writeFile(mainPath, DEFAULT_DOCUMENT, "utf8");
     await ensureGitRepository(projectDir);
     const build = database.getBuild(projectId);
     build.pdf = build.pdf && existsSync(path.join(buildDir, "latest.pdf"));
@@ -1084,13 +1147,14 @@ export async function createPaperServer(options: ServerOptions = {}): Promise<Pa
       || left.name.localeCompare(right.name));
   }
 
-  async function createProject(name: unknown, ownerUsername: string | null, importedFiles: ImportedProjectFile[] = []): Promise<ProjectRuntime> {
+  async function createProject(name: unknown, ownerUsername: string | null, importedFiles: ImportedProjectFile[] = [], empty = false): Promise<ProjectRuntime> {
     const projectName = cleanProjectName(name);
+    if (empty && importedFiles.length) throw apiError("invalid_request", "an empty project cannot import files", 400);
     let id = randomProjectId();
     while (database.getProject(id) || existsSync(path.join(projectsDir, id))) id = randomProjectId();
     const projectRoot = path.join(projectsDir, id);
     const createdAt = new Date().toISOString();
-    const metadata: ProjectMetadata = { id, name: projectName, ownerUsername, createdAt, lastOpenedAt: createdAt, shareToken: randomToken() };
+    const metadata: ProjectMetadata = { id, name: projectName, ownerUsername, createdAt, lastOpenedAt: createdAt, shareToken: randomToken(), ...(empty ? { git: { awaitingPush: true } } : {}) };
     await mkdir(projectRoot, { recursive: true });
     try {
       for (const file of importedFiles) {

@@ -517,8 +517,10 @@ function showToast(message: string): void {
   state.toastTimer = setTimeout(() => { elements.toast.hidden = true; }, 3200);
 }
 
-function openActionDialog({ title, label = "", value = "", maxLength = 512, message = "", submitLabel, danger = false, zip = false, allowEmpty = false, inputType = "text" }: DialogOptions): Promise<string | boolean | null> {
+function openActionDialog({ title, label = "", value = "", maxLength = 512, message = "", submitLabel, danger = false, zip = false, emptyProject = false, allowEmpty = false, inputType = "text" }: DialogOptions): Promise<string | boolean | null> {
   document.querySelector("#project-zip-field")?.remove();
+  document.querySelector("#project-empty-field")?.remove();
+  let zipInput: HTMLInputElement | null = null;
   if (zip) {
     const field = document.createElement("label");
     field.id = "project-zip-field";
@@ -531,6 +533,32 @@ function openActionDialog({ title, label = "", value = "", maxLength = 512, mess
     input.className = "text-sm file:mr-3 file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-secondary-foreground";
     field.append(input);
     elements.action_form.querySelector("footer").before(field);
+    zipInput = input;
+  }
+  if (emptyProject) {
+    const field = document.createElement("div");
+    field.id = "project-empty-field";
+    field.className = "grid gap-1.5";
+    const row = document.createElement("label");
+    row.className = "flex items-center gap-2 text-sm font-medium";
+    const input = document.createElement("input");
+    input.id = "project-empty-input";
+    input.type = "checkbox";
+    input.className = "size-4";
+    const caption = document.createElement("span");
+    localizedText(caption, () => t("Start empty for an existing Git repository"));
+    row.append(input, caption);
+    const hint = document.createElement("p");
+    hint.className = "text-xs text-muted-foreground";
+    localizedText(hint, () => t("No starter document and no history: add the project as a remote and push your repository as it is."));
+    field.append(row, hint);
+    elements.action_form.querySelector("footer").before(field);
+    input.addEventListener("change", () => {
+      if (!zipInput) return;
+      if (input.checked) zipInput.value = "";
+      zipInput.disabled = input.checked;
+      document.querySelector("#project-zip-field")?.classList.toggle("opacity-50", input.checked);
+    });
   }
   const hasInput = Boolean(label);
   localizedText(elements.action_title, () => title);
@@ -3791,8 +3819,14 @@ function updateGitAccess(): void {
     button.classList.toggle("active", mode === gitAccessMode);
   }
   const url = ssh ? sshGitAccess?.url : currentAccessShare ? `${window.location.origin}${currentAccessShare.clonePath}` : null;
-  elements.clone_command.value = url ? `git clone ${url}` : "";
+  // An empty project has nothing to clone: it is waiting for an existing
+  // repository to be pushed into it, so offer that command instead.
+  const awaitingPush = Boolean(state.projects.find(project => project.id === state.projectId)?.git?.awaitingPush);
+  elements.clone_command.value = url ? awaitingPush ? `git remote add latexcoder ${url} && git push -u latexcoder main` : `git clone ${url}` : "";
   (document.getElementById("copy-clone-command") as HTMLButtonElement).disabled = !url;
+  document.getElementById("git-empty-hint")!.hidden = !awaitingPush;
+  localizedText(document.getElementById("git-empty-hint")!, () => awaitingPush
+    ? t("This project is empty and keeps the history you push. Run this inside your existing repository.") : "");
   localizedText(document.getElementById("git-access-description")!, () => ssh
     ? sshGitAccess!.keyCount ? t("Authenticate with the private key matching a public key in your account.")
       : t("Add an SSH public key to your account before cloning. Your private key stays on your device.")
@@ -4256,6 +4290,7 @@ elements.new_project.addEventListener("click", async () => {
   const name = await openActionDialog({
     title: t("New project"),
     zip: true,
+    emptyProject: true,
     label: t("Project name"),
     value: t("Untitled paper"),
     maxLength: 80,
@@ -4263,15 +4298,16 @@ elements.new_project.addEventListener("click", async () => {
   });
   if (!name) return;
   try {
-    const archive = (document.querySelector("#project-zip-input") as HTMLInputElement)?.files?.[0];
+    const startEmpty = (document.querySelector("#project-empty-input") as HTMLInputElement)?.checked ?? false;
+    const archive = startEmpty ? undefined : (document.querySelector("#project-zip-input") as HTMLInputElement)?.files?.[0];
     const result = await request<{ project: ProjectSummary }>(archive ? `v1/projects?name=${encodeURIComponent(String(name))}` : "v1/projects", {
       method: "POST",
       headers: { "Content-Type": archive ? "application/zip" : "application/json" },
-      body: archive || JSON.stringify({ name }),
+      body: archive || JSON.stringify({ name, empty: startEmpty }),
     });
     await refreshProjects(result.project.id);
     await openProjectPage(result.project.id);
-    showToast(t("Project created."));
+    showToast(startEmpty ? t("Empty project created. Push your repository to it from Git access.") : t("Project created."));
   } catch (error) { showToast(error.message); }
 });
 elements.compile_button.addEventListener("click", compile);

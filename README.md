@@ -60,8 +60,9 @@ can clone, push to, and back up like any other directory.
 
 ### Preview as you write
 
-- Compile with Tectonic or latexmk. If neither is installed, a verified
-  Tectonic binary is set up automatically on first use.
+- Compile with Tectonic or latexmk (pdflatex); the Docker image ships both.
+  Outside Docker, if neither is installed, a verified Tectonic binary is set
+  up automatically on first use.
 - Navigate both ways with SyncTeX: source to PDF and PDF back to source.
 - The last successful PDF stays on screen while you edit and is only flagged
   when it goes stale.

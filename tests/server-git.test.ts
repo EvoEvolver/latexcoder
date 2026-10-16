@@ -359,3 +359,61 @@ test("Git conflicts quarantine incoming commits while Yjs stays on main", async 
     assert.doesNotMatch(await testGit(projectDir, ["branch", "--list", "conflict/*"]), /conflict\//);
   });
 });
+
+test("an empty project adopts the history of an existing repository pushed into it", async () => {
+  await withServer(async ({ base }) => {
+    const created = await fetch(`${base}/v1/projects`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Existing repository", empty: true }),
+    });
+    assert.equal(created.status, 201);
+    const projectId = (await created.json()).project.id;
+    const listed = (await (await fetch(`${base}/v1/projects`)).json()).projects
+      .find((project: { id: string }) => project.id === projectId);
+    assert.equal(listed.git.awaitingPush, true);
+    assert.deepEqual((await (await fetch(`${base}/v1/project?project=${projectId}`)).json()).project.files, []);
+
+    const temporary = await mkdtemp(path.join(os.tmpdir(), "latexcoder-adopt-test-"));
+    try {
+      const share = (await (await fetch(`${base}/v1/project/share?project=${projectId}`, { method: "POST" })).json()).share;
+      const origin = path.join(temporary, "origin");
+      await mkdir(origin, { recursive: true });
+      await testGit(origin, ["init", "-b", "main"]);
+      await writeFile(path.join(origin, "paper.tex"), "already written elsewhere\n", "utf8");
+      await testGit(origin, ["add", "-A"]);
+      await testGit(origin, ["commit", "-m", "First commit of the existing repository"]);
+      await writeFile(path.join(origin, "paper.tex"), "already written elsewhere, revised\n", "utf8");
+      await testGit(origin, ["commit", "-am", "Second commit of the existing repository"]);
+      const history = await testGit(origin, ["log", "--format=%s"]);
+
+      // A plain push, with no force and no unrelated-history merge.
+      await testGit(origin, ["remote", "add", "latexcoder", `${base}${share.clonePath}`]);
+      await testGit(origin, ["push", "latexcoder", "main"]);
+
+      assert.equal(
+        await (await fetch(`${base}/v1/files?project=${projectId}&path=paper.tex`)).text(),
+        "already written elsewhere, revised\n",
+      );
+      const gitState = await (await fetch(`${base}/v1/git?project=${projectId}`)).json();
+      assert.equal(gitState.git.dirty, false);
+      assert.deepEqual(gitState.git.history.map((entry: { subject: string }) => entry.subject), history.split("\n"));
+      const detail = (await (await fetch(`${base}/v1/project?project=${projectId}`)).json()).project;
+      assert.equal(detail.main, "paper.tex");
+      const reloaded = (await (await fetch(`${base}/v1/projects`)).json()).projects
+        .find((project: { id: string }) => project.id === projectId);
+      assert.equal(reloaded.git?.awaitingPush, undefined);
+
+      // The project now behaves like any other: the next push fast-forwards.
+      await writeFile(path.join(origin, "paper.tex"), "pushed again\n", "utf8");
+      await testGit(origin, ["commit", "-am", "Third commit"]);
+      await testGit(origin, ["push", "latexcoder", "main"]);
+      assert.equal(
+        await (await fetch(`${base}/v1/files?project=${projectId}&path=paper.tex`)).text(),
+        "pushed again\n",
+      );
+    } finally {
+      await rm(temporary, { recursive: true, force: true });
+    }
+  });
+});

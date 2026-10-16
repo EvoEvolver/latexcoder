@@ -30,9 +30,11 @@ export function registerProjectRoutes(app: RouteApp, context: ProjectRouteContex
   app.post("/v1/projects", json({ limit: "16kb" }), raw({ type: "application/zip", limit: "20mb" }), async (request, response, next) => {
     try {
       const user = context.requireUser(request);
-      const importedFiles = request.is("application/zip") ? readProjectZip(request.body) : [];
-      const name = request.is("application/zip") ? request.query.name : parseBody(createProjectRequestSchema, request.body).name;
-      const runtime = await context.createProject(name, user.username, importedFiles);
+      const archive = Boolean(request.is("application/zip"));
+      const body = archive ? null : parseBody(createProjectRequestSchema, request.body);
+      const importedFiles = archive ? readProjectZip(request.body) : [];
+      const name = archive ? request.query.name : body!.name;
+      const runtime = await context.createProject(name, user.username, importedFiles, body?.empty ?? false);
       response.status(201).json({ project: { ...context.publicProjectMetadata(runtime.metadata), build: runtime.build, tags: [], archived: false } });
     } catch (error) { next(error); }
   });

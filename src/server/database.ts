@@ -598,12 +598,14 @@ export class StateDatabase {
   }
 
   getSettings(projectId: string) {
-    const row = this.db.prepare("SELECT compiler, auto_compile FROM project_settings WHERE project_id = ?").get(projectId) as SqlRow | undefined;
-    return { main: this.getBuild(projectId).main, compiler: row?.compiler ? String(row.compiler) : "auto", autoCompile: Boolean(row?.auto_compile) };
+    const row = this.db.prepare("SELECT compiler FROM project_settings WHERE project_id = ?").get(projectId) as SqlRow | undefined;
+    return { main: this.getBuild(projectId).main, compiler: row?.compiler ? String(row.compiler) : "auto" };
   }
 
-  saveSettings(projectId: string, settings: { compiler: string; autoCompile: boolean }) {
-    this.db.prepare("INSERT INTO project_settings (project_id, compiler, auto_compile) VALUES (?, ?, ?) ON CONFLICT(project_id) DO UPDATE SET compiler = excluded.compiler, auto_compile = excluded.auto_compile").run(projectId, settings.compiler, settings.autoCompile ? 1 : 0);
+  // project_settings.auto_compile is no longer read: automatic compilation is
+  // a personal preference kept by each browser.
+  saveSettings(projectId: string, settings: { compiler: string }) {
+    this.db.prepare("INSERT INTO project_settings (project_id, compiler) VALUES (?, ?) ON CONFLICT(project_id) DO UPDATE SET compiler = excluded.compiler").run(projectId, settings.compiler);
   }
 
   createTrash(projectId: string, id: string, originalPath: string, directory: boolean, files: Array<{ path: string; content: Uint8Array; snapshot: Uint8Array | null; directory: boolean }>) {

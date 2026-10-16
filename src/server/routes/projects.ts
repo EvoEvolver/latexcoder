@@ -112,10 +112,10 @@ export function registerProjectRoutes(app: RouteApp, context: ProjectRouteContex
       if (runtime.compilePromise) throw apiError("compile_running", "Wait for compilation before changing settings", 409);
       const body = parseBody(settingsRequestSchema, request.body);
       const main = contentPath(body.main);
-      const { compiler, autoCompile } = body;
+      const { compiler } = body;
       if (!main.endsWith(".tex") || !existsSync(path.join(runtime.projectDir, main))) throw apiError("invalid_main", "Select an existing .tex file");
-      if (!["auto", "tectonic", "latexmk"].includes(compiler) || typeof autoCompile !== "boolean") throw apiError("invalid_settings", "Invalid compiler or automatic compilation setting");
-      database.saveSettings(runtime.id, { compiler, autoCompile });
+      if (!["auto", "tectonic", "latexmk"].includes(compiler)) throw apiError("invalid_settings", "Invalid compiler");
+      database.saveSettings(runtime.id, { compiler });
       runtime.build.main = main;
       database.saveBuild(runtime.id, runtime.build);
       response.json({ settings: database.getSettings(runtime.id) });

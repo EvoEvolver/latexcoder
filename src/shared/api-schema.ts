@@ -31,7 +31,6 @@ export const projectArchiveRequestSchema = z.strictObject({ archived: z.boolean(
 export const settingsRequestSchema = z.strictObject({
   main: z.string().min(1),
   compiler: z.enum(["auto", "tectonic", "latexmk"]),
-  autoCompile: z.boolean(),
 });
 export const compileSelectionSchema = z.strictObject({ mode: z.enum(["project", "chapter"]).optional(), file: z.string().min(1).optional() });
 export const compileRequestSchema = compileSelectionSchema.extend({ main: z.string().optional() });
@@ -43,7 +42,7 @@ export const currentUserSchema = z.object({
   userType: userTypeSchema.default("external"),
 });
 export const projectFileSchema = z.object({ path: z.string(), size: z.number(), text: z.boolean() });
-export const editorSettingsSchema = z.object({ main: z.string(), autoCompile: z.boolean(), compiler: z.string() });
+export const editorSettingsSchema = z.object({ main: z.string(), compiler: z.string() });
 export const projectSummarySchema = z.object({
   id: z.string(),
   name: z.string(),

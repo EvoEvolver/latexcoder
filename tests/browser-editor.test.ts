@@ -407,9 +407,10 @@ test("automatic compilation is debounced and errors navigate to source", async (
       errors: [{ path: "/tmp/latexcoder-build/main.tex", line: 3, message: "Undefined control sequence" }],
       stale: true,
     } }) }));
-    await chooseAppMenu(page, "project", "#project-settings");
-    await page.locator("#settings-auto").check();
-    await page.locator("#settings-form button[type=submit]").click();
+    // Automatic compilation is a personal preference in the compile menu.
+    await page.locator("#compile-mode").click();
+    await page.locator("#compile-auto").click();
+    assert.equal(await page.evaluate(() => localStorage.getItem("latexcoder-auto-compile")), "on");
     await page.evaluate(() => {
       const { view } = globalThis.__paperE2E.state;
       for (const text of [" A", " B", " C"]) view.dispatch({ changes: { from: view.state.doc.length, insert: text } });

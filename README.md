@@ -234,8 +234,9 @@ commits — history is never rewritten.
 
 ## Compilation
 
-Project settings select the main TeX file, the compiler, and optional
-automatic compilation. The Log view groups errors and warnings, highlights the
+Project settings select the main TeX file and the compiler. Automatic
+compilation is a personal choice in the compile menu, remembered by each
+browser across projects. The Log view groups errors and warnings, highlights the
 first fatal error, and links each diagnostic to its source file and line
 alongside the full compiler output.
 

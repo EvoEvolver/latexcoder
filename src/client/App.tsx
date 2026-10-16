@@ -372,7 +372,6 @@ export function AppShell() {
           <Localized title="Project settings"><DialogHeader title="Project settings" closeId="settings-close" /></Localized>
           <label className="grid gap-1.5 text-sm" htmlFor="settings-main"><Message id="Main document" /><select id="settings-main" className="h-9 min-w-0 rounded-md border bg-background px-3" /></label>
           <label className="grid gap-1.5 text-sm" htmlFor="settings-compiler"><Message id="Compiler" /><select id="settings-compiler" className="h-9 rounded-md border bg-background px-3"><Localized text="Automatic"><option value="auto">Automatic</option></Localized><option value="tectonic">Tectonic</option><option value="latexmk">latexmk</option></select></label>
-          <label className="flex items-center gap-2 text-sm"><input id="settings-auto" type="checkbox" /><Message id="Automatic compilation" /></label>
           <div className="flex flex-wrap gap-2 border-t pt-4">
             <Button id="open-trash" type="button" variant="outline" size="sm"><Icon name="trash-2" /><Message id="Recently deleted" /></Button>
             <Localized title="Download project ZIP"><Button id="download-project" variant="outline" size="sm" title="Download project ZIP" asChild><a><Icon name="archive" /><Message id="Download ZIP" /></a></Button></Localized>

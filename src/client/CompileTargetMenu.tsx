@@ -4,20 +4,27 @@ import { ChevronDown } from "lucide-react";
 import type { CompileMode } from "../shared/compile-directives";
 import { Message } from "./Localized";
 import { scheduleLocalizedDomRefresh } from "./i18n";
+import { AUTO_COMPILE_EVENT, autoCompileEnabled, setAutoCompileEnabled } from "./auto-compile";
 import { Button } from "./components/ui/button";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup,
-  DropdownMenuRadioItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuRadioGroup,
+  DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "./components/ui/dropdown-menu";
 
 export function CompileTargetMenu() {
   const { t } = useTranslation();
   const [mode, setMode] = useState<CompileMode>("project");
+  const [autoCompile, setAutoCompile] = useState(autoCompileEnabled);
   useLayoutEffect(scheduleLocalizedDomRefresh);
   useEffect(() => {
     const sync = (event: Event) => setMode((event as CustomEvent<CompileMode>).detail);
+    const syncAuto = (event: Event) => setAutoCompile((event as CustomEvent<boolean>).detail);
     window.addEventListener("latexcoder-compile-mode-change", sync);
-    return () => window.removeEventListener("latexcoder-compile-mode-change", sync);
+    window.addEventListener(AUTO_COMPILE_EVENT, syncAuto);
+    return () => {
+      window.removeEventListener("latexcoder-compile-mode-change", sync);
+      window.removeEventListener(AUTO_COMPILE_EVENT, syncAuto);
+    };
   }, []);
   const select = (value: CompileMode) => {
     setMode(value);
@@ -36,6 +43,8 @@ export function CompileTargetMenu() {
         <DropdownMenuRadioItem id="compile-mode-project" value="project" onSelect={() => select("project")}><Message id="Top-level root" /></DropdownMenuRadioItem>
         <DropdownMenuRadioItem id="compile-mode-chapter" value="chapter" onSelect={() => select("chapter")}><Message id="Chapter root" /></DropdownMenuRadioItem>
       </DropdownMenuRadioGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuCheckboxItem id="compile-auto" checked={autoCompile} onCheckedChange={checked => setAutoCompileEnabled(checked === true)}><Message id="Automatic compilation" /></DropdownMenuCheckboxItem>
     </DropdownMenuContent>
   </DropdownMenu>;
 }

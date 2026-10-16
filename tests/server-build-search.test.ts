@@ -247,10 +247,12 @@ test("project settings persist and failed compilation retains a visibly stale ca
     await withServer(async ({ base, database }) => {
       const project = (await (await fetch(`${base}/v1/project`)).json()).project;
       await fetch(`${base}/v1/files?path=other.tex`, { method: "PUT", body: "Other source" });
-      const settings = await fetch(`${base}/v1/settings`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ main: "other.tex", compiler: "auto", autoCompile: true }) });
+      const settings = await fetch(`${base}/v1/settings`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ main: "other.tex", compiler: "auto" }) });
       assert.equal(settings.status, 200);
-      assert.deepEqual(database.getSettings(project.id), { main: "other.tex", compiler: "auto", autoCompile: true });
-      const invalid = await fetch(`${base}/v1/settings`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ main: "../oops.tex", compiler: "auto", autoCompile: false }) });
+      assert.deepEqual(database.getSettings(project.id), { main: "other.tex", compiler: "auto" });
+      const personal = await fetch(`${base}/v1/settings`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ main: "other.tex", compiler: "auto", autoCompile: true }) });
+      assert.equal(personal.status, 400, "automatic compilation is not a project setting");
+      const invalid = await fetch(`${base}/v1/settings`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ main: "../oops.tex", compiler: "auto" }) });
       assert.equal(invalid.status, 400);
       const firstPdf = await (await fetch(`${base}/v1/build/pdf`)).text();
       await fetch(`${base}/v1/files?path=other.tex`, { method: "PUT", body: "Before\n\\cmtbg{one}{Name}Body\\cmted{Comment\non another line}\nAfter" });

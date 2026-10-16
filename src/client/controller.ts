@@ -87,6 +87,7 @@ import { yCollab, ySyncAnnotation, yUndoManagerKeymap } from "y-codemirror.next"
 import { WebsocketProvider } from "y-websocket";
 import { Awareness } from "y-protocols/awareness";
 import { diffLines } from "diff";
+import { AUTO_COMPILE_EVENT, autoCompileEnabled } from "./auto-compile.ts";
 import * as Y from "yjs";
 
 import { parseReviews, stripReviewStorage, type ReviewItem } from "../shared/review.ts";
@@ -433,7 +434,7 @@ function updateSyncStatus() {
 
 function scheduleAutoCompile() {
   clearTimeout(autoCompileTimer);
-  if (state.projectCanEdit && state.settings?.autoCompile && state.projectId) autoCompileTimer = setTimeout(() => {
+  if (state.projectCanEdit && autoCompileEnabled() && state.projectId) autoCompileTimer = setTimeout(() => {
     if (state.provider?.wsconnected && state.provider.synced) compile();
   }, 1200);
 }
@@ -4486,6 +4487,10 @@ for (const id of ["projects-about", "editor-about", "admin-about"]) {
 }
 document.getElementById("about-close")!.addEventListener("click", () => aboutDialog.close());
 
+// Turning automatic compilation on catches up on pending edits; turning it
+// off cancels a compile that is waiting to run.
+window.addEventListener(AUTO_COMPILE_EVENT, () => scheduleAutoCompile());
+
 const settingsDialog = document.getElementById("settings-dialog") as HTMLDialogElement;
 onDynamicClick("project-settings", async () => {
   try {
@@ -4495,7 +4500,6 @@ onDynamicClick("project-settings", async () => {
     for (const file of state.files.filter(file => file.path.endsWith(".tex"))) main.add(new Option(file.path, file.path));
     main.value = settings.main;
     (document.getElementById("settings-compiler") as HTMLSelectElement).value = settings.compiler;
-    (document.getElementById("settings-auto") as HTMLInputElement).checked = settings.autoCompile;
     settingsDialog.showModal();
   } catch (error) { showToast(error.message); }
 });
@@ -4503,7 +4507,7 @@ document.getElementById("settings-close")!.addEventListener("click", () => setti
 document.getElementById("settings-form")!.addEventListener("submit", async event => {
   event.preventDefault();
   try {
-    const { settings } = await request<{ settings: EditorSettings }>("v1/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ main: (document.getElementById("settings-main") as HTMLSelectElement).value, compiler: (document.getElementById("settings-compiler") as HTMLSelectElement).value, autoCompile: (document.getElementById("settings-auto") as HTMLInputElement).checked }) });
+    const { settings } = await request<{ settings: EditorSettings }>("v1/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ main: (document.getElementById("settings-main") as HTMLSelectElement).value, compiler: (document.getElementById("settings-compiler") as HTMLSelectElement).value }) });
     state.settings = settings; state.main = settings.main;
     settingsDialog.close(); markPdfStale(); scheduleAutoCompile();
     renderFiles();

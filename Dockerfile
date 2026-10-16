@@ -19,6 +19,7 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     bubblewrap \
     ca-certificates \
+    cm-super \
     curl \
     git \
     latexmk \

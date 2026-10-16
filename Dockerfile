@@ -13,27 +13,48 @@ RUN pnpm build
 
 FROM node:22-trixie-slim AS runtime
 
-# latexmk drives pdflatex, which needs the LaTeX format and packages from the
-# texlive-latex-* collections; texlive-binaries alone ships only the engines.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     bubblewrap \
     ca-certificates \
-    cm-super \
     curl \
+    fontconfig \
+    ghostscript \
     git \
-    latexmk \
+    perl \
     ripgrep \
-    texlive-binaries \
-    texlive-font-utils \
-    texlive-fonts-recommended \
-    texlive-lang-european \
-    texlive-latex-base \
-    texlive-latex-extra \
-    texlive-latex-recommended \
-    texlive-science \
     tini \
+    xz-utils \
   && rm -rf /var/lib/apt/lists/*
+
+# A complete upstream TeX Live, matching what authors run locally, so
+# documents do not fail on whichever package or font a distribution split
+# left out. Documentation and sources are skipped to keep the image smaller.
+# Override TEXLIVE_REPOSITORY to pin a mirror when the CTAN redirector is slow.
+ARG TEXLIVE_REPOSITORY=https://mirror.ctan.org/systems/texlive/tlnet
+RUN mkdir /tmp/install-tl \
+  && curl -fsSL "${TEXLIVE_REPOSITORY}/install-tl-unx.tar.gz" | tar -xz --strip-components=1 -C /tmp/install-tl \
+  && printf '%s\n' \
+    'selected_scheme scheme-full' \
+    'TEXDIR /usr/local/texlive' \
+    'TEXMFLOCAL /usr/local/texlive/texmf-local' \
+    'TEXMFSYSCONFIG /usr/local/texlive/texmf-config' \
+    'TEXMFSYSVAR /usr/local/texlive/texmf-var' \
+    'instopt_adjustpath 1' \
+    'instopt_adjustrepo 1' \
+    'instopt_letter 0' \
+    'instopt_write18_restricted 1' \
+    'tlpdbopt_autobackup 0' \
+    'tlpdbopt_install_docfiles 0' \
+    'tlpdbopt_install_srcfiles 0' \
+    'tlpdbopt_sys_bin /usr/local/bin' \
+    'tlpdbopt_sys_info /usr/local/share/info' \
+    'tlpdbopt_sys_man /usr/local/share/man' \
+    > /tmp/install-tl/texlive.profile \
+  && /tmp/install-tl/install-tl --no-interaction --profile /tmp/install-tl/texlive.profile --repository "${TEXLIVE_REPOSITORY}" \
+  && rm -rf /tmp/install-tl \
+  && pdflatex --version | head -1 \
+  && latexmk -v | head -2
 
 WORKDIR /app
 

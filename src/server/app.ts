@@ -22,6 +22,7 @@ import { createProjectSearch } from "./search.ts";
 import { CompileQueue } from "./compile-queue.ts";
 import { createCompileService } from "./compile-service.ts";
 import { checkDependencies } from "./dependencies.ts";
+import { createTexLiveManager } from "./texlive.ts";
 import { createLogger, requestLogger } from "./logger.ts";
 import { registerAuthRoutes } from "./routes/auth.ts";
 import { registerAdminRoutes } from "./routes/admin.ts";
@@ -867,6 +868,16 @@ export async function createPaperServer(options: ServerOptions = {}): Promise<Pa
   const autoCheckpoints = new Map<string, AutoCheckpoint>();
   const compileConcurrency = options.compileConcurrency ?? Number(process.env.LATEXCODER_COMPILE_CONCURRENCY || 2);
   const compileQueue = new CompileQueue(compileConcurrency);
+  // TeX Live sits on persistent storage next to the state so redeploys keep
+  // it; checked before the dependency report so an installed latexmk is seen.
+  const texlive = createTexLiveManager({
+    dir: options.texliveDir || process.env.LATEXCODER_TEXLIVE_DIR || path.join(stateDir, "texlive"),
+    install: options.texliveInstall ?? /^(1|true|yes)$/i.test(process.env.LATEXCODER_TEXLIVE_INSTALL || ""),
+    repository: options.texliveRepository || process.env.LATEXCODER_TEXLIVE_REPOSITORY,
+    installer: options.texliveInstaller,
+    logPath: path.join(stateDir, "texlive-install.log"),
+    logger,
+  });
   const dependencies = await checkDependencies(stateDir, options);
   logger.info("server.dependencies", { dependencies });
 
@@ -1266,6 +1277,7 @@ export async function createPaperServer(options: ServerOptions = {}): Promise<Pa
     logger,
     serverOptions: options,
     assertWritable: assertProjectWritable,
+    texlive,
   });
 
   async function withAgentHistory<T>(request: Request, runtime: ProjectRuntime, label: string, task: () => Promise<T> | T, always = false): Promise<T> {
@@ -1355,6 +1367,7 @@ export async function createPaperServer(options: ServerOptions = {}): Promise<Pa
       schemaVersion: database.schemaVersion(),
       queue,
       dependencies,
+      texlive: texlive.status(),
     };
   };
   registerPublicRoutes(app, {
@@ -1499,11 +1512,12 @@ export async function createPaperServer(options: ServerOptions = {}): Promise<Pa
     if (ssh) await ssh.close();
     for (const listeners of projectEvents.values()) for (const response of listeners) response.end();
     compileQueue.close();
+    texlive.close();
     for (const runtime of projects.values()) runtime.collaboration.shutdown();
     database.close();
   };
   return {
-    app, server, sockets, stateDir, projectsDir, projects, database, shutdown, sshServer: ssh?.server,
+    app, server, sockets, stateDir, projectsDir, projects, database, shutdown, sshServer: ssh?.server, texlive,
     // Kept for API consumers of the original single-project server.
     projectDir: defaultRuntime?.projectDir,
     collaboration: defaultRuntime?.collaboration,

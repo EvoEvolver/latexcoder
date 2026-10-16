@@ -13,6 +13,7 @@ import type { BuildMetadata, StateDatabase } from "./database.ts";
 import type { Logger } from "./logger.ts";
 import { listFiles } from "./project-files.ts";
 import { run } from "./process.ts";
+import type { TexLiveManager } from "./texlive.ts";
 import type { ProjectRuntime, ServerOptions } from "./types.ts";
 
 type CompileServiceOptions = {
@@ -22,6 +23,7 @@ type CompileServiceOptions = {
   logger: Logger;
   serverOptions: ServerOptions;
   assertWritable(runtime: ProjectRuntime): void;
+  texlive?: TexLiveManager;
 };
 
 export function compilerArguments(executable: string, outputDir: string, main: string, tectonicBundleUrl?: string): string[] {
@@ -32,7 +34,7 @@ export function compilerArguments(executable: string, outputDir: string, main: s
   return [...(bundleUrl ? ["--bundle", bundleUrl] : []), "--synctex", "--keep-logs", "--outdir", outputDir, main];
 }
 
-export function createCompileService({ stateDir, database, queue, logger, serverOptions, assertWritable }: CompileServiceOptions) {
+export function createCompileService({ stateDir, database, queue, logger, serverOptions, assertWritable, texlive }: CompileServiceOptions) {
   const targets = new WeakMap<ProjectRuntime, Map<string, Promise<ProjectRuntime>>>();
   const resolveBuildRuntime = async (project: ProjectRuntime, selection: CompileSelection): Promise<ProjectRuntime> => {
     project.collaboration.flush();
@@ -109,12 +111,17 @@ export function createCompileService({ stateDir, database, queue, logger, server
       }
       const outputDir = path.join(workDir, ".paper-output");
       await mkdir(outputDir, { recursive: true });
-      const compiler = await findCompiler(
-        settings.compiler === "auto" ? serverOptions.compiler || process.env.LATEXCODER_LATEX_BIN : settings.compiler,
-        settings.compiler === "latexmk" ? "" : stateDir,
-      );
-      if (settings.compiler !== "auto" && !path.basename(compiler).startsWith(settings.compiler)) {
-        throw apiError("compiler_unavailable", `The selected compiler ${settings.compiler} is not installed`, 503);
+      let compiler: string;
+      try {
+        compiler = await findCompiler(
+          settings.compiler === "auto" ? serverOptions.compiler || process.env.LATEXCODER_LATEX_BIN : settings.compiler,
+          settings.compiler === "latexmk" ? "" : stateDir,
+        );
+        if (settings.compiler !== "auto" && !path.basename(compiler).startsWith(settings.compiler)) {
+          throw apiError("compiler_unavailable", `The selected compiler ${settings.compiler} is not installed`, 503);
+        }
+      } catch (error) {
+        throw texlive ? texlive.explain(error) : error;
       }
       const executable = path.basename(compiler);
       const tectonicBundleUrl = serverOptions.tectonicBundleUrl ?? process.env.LATEXCODER_TECTONIC_BUNDLE_URL;

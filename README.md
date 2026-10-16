@@ -60,8 +60,9 @@ can clone, push to, and back up like any other directory.
 
 ### Preview as you write
 
-- Compile with Tectonic or latexmk; the Docker image ships Tectonic and a
-  complete TeX Live (pdfLaTeX, XeLaTeX, LuaLaTeX).
+- Compile with Tectonic or latexmk; the Docker image ships Tectonic and
+  installs a complete TeX Live (pdfLaTeX, XeLaTeX, LuaLaTeX) onto its
+  persistent volume at first start.
   Outside Docker, if neither is installed, a verified Tectonic binary is set
   up automatically on first use.
 - Navigate both ways with SyncTeX: source to PDF and PDF back to source.
@@ -132,9 +133,15 @@ more users from the admin panel with registration links.
 
 ## Deploy with Docker or Railway
 
-The image includes Tectonic, SyncTeX, Git, ripgrep, and bubblewrap, and stores
-all persistent state beneath `/data`. Container HTTP defaults to `8080`;
-the example below maps it to `8090` on your machine. SSH uses `2222`.
+The image includes Tectonic, Git, ripgrep, and bubblewrap, and stores all
+persistent state beneath `/data`. A complete TeX Live (latexmk, pdfLaTeX,
+XeLaTeX, LuaLaTeX, SyncTeX, biber) is installed into `/data/texlive` in the
+background the first time a container starts with an empty volume, which
+takes a few minutes; until then latexmk builds report that the installation
+is running while Tectonic builds work. Every later container, including each
+redeploy, reuses that installation, so keep `/data` on a volume. Delete
+`/data/texlive` to reinstall. Container HTTP defaults to `8080`; the example
+below maps it to `8090` on your machine. SSH uses `2222`.
 
 ```sh
 docker build -t latexcoder .
@@ -271,6 +278,9 @@ keep their own PDF, log, and source-navigation data. See the
 | `LATEXCODER_SSH_PUBLIC_HOST` | `RAILWAY_TCP_PROXY_DOMAIN` | Public hostname for SSH Git; explicit configuration overrides the Railway fallback. |
 | `LATEXCODER_SSH_PUBLIC_PORT` | `RAILWAY_TCP_PROXY_PORT` | External SSH port; explicit configuration overrides the Railway fallback. Does not change the internal listener port. |
 | `LATEXCODER_LATEX_BIN` | auto-detected | Explicit Tectonic or latexmk executable. |
+| `LATEXCODER_TEXLIVE_DIR` | `<state dir>/texlive` | Where TeX Live lives; its `bin/linux` joins `PATH` once installed. The Docker image sets `/data/texlive`. |
+| `LATEXCODER_TEXLIVE_INSTALL` | unset (`1` in Docker) | Install TeX Live into `LATEXCODER_TEXLIVE_DIR` in the background when it is missing; progress is logged to `<state dir>/texlive-install.log` and reported by `GET /health/ready`. |
+| `LATEXCODER_TEXLIVE_REPOSITORY` | an MIT CTAN mirror | TeX Live network repository used for that installation. |
 | `LATEXCODER_TECTONIC_BUNDLE_URL` | Tectonic default | Tectonic bundle mirror URL, useful when the default package bundle is slow or unavailable. |
 | `LATEXCODER_COMPILE_CONCURRENCY` | `2` | Process-wide concurrent build limit. |
 | `LATEXCODER_RG_BIN` | `rg` | ripgrep executable used by regex search. |

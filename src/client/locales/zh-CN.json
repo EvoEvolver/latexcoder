@@ -566,6 +566,7 @@
   "Enter a display name between 1 and 28 characters.": "请输入 1 到 28 个字符的显示名称。",
   "The file is too large.": "文件过大。",
   "This action overlaps an open review. Resolve it before trying again.": "此操作与未解决的审阅重叠，请先处理审阅。",
+  "TeX Live is still being installed on the server. Try again in a few minutes, or compile with Tectonic meanwhile.": "服务器仍在安装 TeX Live。请过几分钟再试，或先用 Tectonic 编译。",
   "Enter a valid SSH public key.": "请输入有效的 SSH 公钥。",
   "Add TL;DR": "添加 TL;DR 摘要",
   "Add section TL;DR": "添加章节 TL;DR 摘要",

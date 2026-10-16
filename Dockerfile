@@ -11,46 +11,11 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
 
-# A complete upstream TeX Live, matching what authors run locally, so
-# documents do not fail on whichever package or font a distribution split
-# left out. Documentation and sources are skipped to keep the image smaller.
-# It lives in its own stage so changes to the runtime layers never invalidate
-# this multi-gigabyte layer. A fixed mirror replaces the mirror.ctan.org
-# redirector, which can land on a mirror with a broken TLS chain; override
-# TEXLIVE_REPOSITORY to use another one.
-FROM node:22-trixie-slim AS texlive
-
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates curl perl xz-utils \
-  && rm -rf /var/lib/apt/lists/*
-
-# The architecture-specific bin directory gets a stable name for PATH.
-ARG TEXLIVE_REPOSITORY=https://mirrors.mit.edu/CTAN/systems/texlive/tlnet
-RUN mkdir /tmp/install-tl \
-  && curl -fsSL --retry 5 --retry-all-errors "${TEXLIVE_REPOSITORY}/install-tl-unx.tar.gz" | tar -xz --strip-components=1 -C /tmp/install-tl \
-  && printf '%s\n' \
-    'selected_scheme scheme-full' \
-    'TEXDIR /usr/local/texlive' \
-    'TEXMFLOCAL /usr/local/texlive/texmf-local' \
-    'TEXMFSYSCONFIG /usr/local/texlive/texmf-config' \
-    'TEXMFSYSVAR /usr/local/texlive/texmf-var' \
-    'instopt_adjustpath 0' \
-    'instopt_adjustrepo 1' \
-    'instopt_letter 0' \
-    'instopt_write18_restricted 1' \
-    'tlpdbopt_autobackup 0' \
-    'tlpdbopt_install_docfiles 0' \
-    'tlpdbopt_install_srcfiles 0' \
-    > /tmp/install-tl/texlive.profile \
-  && /tmp/install-tl/install-tl --no-interaction --profile /tmp/install-tl/texlive.profile --repository "${TEXLIVE_REPOSITORY}" \
-  && rm -rf /tmp/install-tl \
-  && ln -s "$(find /usr/local/texlive/bin -mindepth 1 -maxdepth 1 -type d -name '*-linux' | head -1)" /usr/local/texlive/bin/linux \
-  && /usr/local/texlive/bin/linux/pdflatex --version >/dev/null
-
 FROM node:22-trixie-slim AS runtime
 
-# perl runs latexmk and other TeX Live scripts; ghostscript converts EPS
-# figures; fontconfig lets XeLaTeX and LuaLaTeX find installed fonts.
+# perl runs the TeX Live installer, latexmk, and other TeX Live scripts;
+# xz-utils unpacks its packages; ghostscript converts EPS figures; fontconfig
+# lets XeLaTeX and LuaLaTeX find installed fonts.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     bubblewrap \
@@ -62,15 +27,17 @@ RUN apt-get update \
     perl \
     ripgrep \
     tini \
+    xz-utils \
   && rm -rf /var/lib/apt/lists/*
-
-COPY --from=texlive /usr/local/texlive /usr/local/texlive
-ENV PATH=/usr/local/texlive/bin/linux:$PATH
-RUN pdflatex --version >/dev/null && latexmk -v >/dev/null && command -v synctex xelatex lualatex biber >/dev/null
 
 WORKDIR /app
 
-COPY scripts/install-tectonic.sh ./scripts/install-tectonic.sh
+# A complete upstream TeX Live is not baked into the image: the server
+# installs it once into LATEXCODER_TEXLIVE_DIR on the persistent volume at
+# first start (see scripts/install-texlive.sh) and every later container
+# reuses it. Set LATEXCODER_TEXLIVE_INSTALL=0 to skip that and rely on
+# Tectonic alone.
+COPY scripts/install-tectonic.sh scripts/install-texlive.sh ./scripts/
 RUN LATEXCODER_STATE_DIR=/opt/latexcoder-compiler ./scripts/install-tectonic.sh \
   && install -m 0755 /opt/latexcoder-compiler/bin/tectonic /usr/local/bin/tectonic \
   && rm -rf /opt/latexcoder-compiler
@@ -83,7 +50,9 @@ COPY src ./src
 ENV NODE_ENV=production \
   PORT=8080 \
   LATEXCODER_HOST=0.0.0.0 \
-  LATEXCODER_STATE_DIR=/data
+  LATEXCODER_STATE_DIR=/data \
+  LATEXCODER_TEXLIVE_DIR=/data/texlive \
+  LATEXCODER_TEXLIVE_INSTALL=1
 
 RUN mkdir -p /data
 

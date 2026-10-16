@@ -566,6 +566,7 @@
   "Enter a display name between 1 and 28 characters.": "表示名は 1～28 文字で入力してください。",
   "The file is too large.": "ファイルが大きすぎます。",
   "This action overlaps an open review. Resolve it before trying again.": "この操作は未解決の確認事項と範囲が重なっています。先に解決してください。",
+  "TeX Live is still being installed on the server. Try again in a few minutes, or compile with Tectonic meanwhile.": "サーバーでは TeX Live のインストールがまだ進行中です。数分後にもう一度試すか、それまでは Tectonic でコンパイルしてください。",
   "Enter a valid SSH public key.": "有効な SSH 公開鍵を入力してください。",
   "Add TL;DR": "TL;DR 要約を追加",
   "Add section TL;DR": "節の TL;DR 要約を追加",

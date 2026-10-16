@@ -19,7 +19,7 @@ export type SearchMatch = { path: string; line: number; from: number; to: number
 export type SearchInput = { query?: unknown; caseSensitive?: boolean; regex?: boolean; path?: unknown; replacement?: unknown };
 export type ReplacementFile = { path: string; baseSha256: string; before: string; source: string; count: number };
 export type SearchOptions = { bwrap?: string; rg?: string; searchTimeoutMs?: number };
-export type ServerOptions = SearchOptions & { sshPort?: number; sshHost?: string; sshPublicHost?: string; sshPublicPort?: number; stateDir?: string; authDisabled?: boolean; adminPassword?: string; compiler?: string; tectonicBundleUrl?: string; synctex?: string; host?: string; port?: number; compileConcurrency?: number; logRequests?: boolean; gitCheckpointIdleMs?: number; gitCheckpointMaxWaitMs?: number };
+export type ServerOptions = SearchOptions & { sshPort?: number; sshHost?: string; sshPublicHost?: string; sshPublicPort?: number; stateDir?: string; texliveDir?: string; texliveInstall?: boolean; texliveRepository?: string; texliveInstaller?: string; authDisabled?: boolean; adminPassword?: string; compiler?: string; tectonicBundleUrl?: string; synctex?: string; host?: string; port?: number; compileConcurrency?: number; logRequests?: boolean; gitCheckpointIdleMs?: number; gitCheckpointMaxWaitMs?: number };
 export type ProcessResult = { code: number | null; output: string };
 export type RipgrepResult = { code: number | null; stdout: Buffer; stderr: Buffer };
 export type ProcessOptions = SpawnOptionsWithoutStdio & { timeoutMs?: number };
@@ -84,6 +84,7 @@ export interface PaperServer {
   projectsDir: string;
   projects: Map<string, ProjectRuntime>;
   database: StateDatabase;
+  texlive: import("./texlive.ts").TexLiveManager;
   shutdown(): Promise<void>;
   sshServer?: import("ssh2").Server;
   projectDir?: string;

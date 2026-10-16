@@ -15,6 +15,7 @@ const errorMessages: Record<string, string> = {
   file_not_found: "Project file not found",
   review_conflict: "This action overlaps an open review. Resolve it before trying again.",
   invalid_ssh_key: "Enter a valid SSH public key.",
+  texlive_installing: "TeX Live is still being installed on the server. Try again in a few minutes, or compile with Tectonic meanwhile.",
 };
 
 export const apiUrl = (relative: string): URL => new URL(`/${relative.replace(/^\//, "")}`, window.location.origin);

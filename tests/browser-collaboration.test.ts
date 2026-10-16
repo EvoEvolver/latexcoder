@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -274,12 +275,13 @@ test("collaborative edits show attributed ranges in blame mode", async () => {
     await page.locator("#toggle-blame").click();
     assert.equal(await page.locator(".cm-blame-author").count(), 0);
 
+    const source = await page.evaluate(() => globalThis.__paperE2E.state.view.state.doc.toString());
     await page.route(/\/v1\/blame\?/, async route => {
       await route.fulfill({
         contentType: "application/json",
         json: {
           path: "main.tex",
-          revision: "test-revision",
+          revision: createHash("sha256").update(source).digest("hex"),
           runs: [
             { from: 0, to: 4, authorId: "alice", authorName: "Alice", changeId: "change-1", createdAt: 1, commit: "1111111", gitAuthor: null },
             { from: 4, to: 8, authorId: "alice", authorName: "Alice", changeId: "change-2", createdAt: 2, commit: "2222222", gitAuthor: null },
@@ -293,6 +295,75 @@ test("collaborative edits show attributed ranges in blame mode", async () => {
     assert.equal(await page.locator(".cm-blame-range").count(), 3, "commit-specific blame ranges should remain separate");
     assert.equal(await page.locator(".cm-blame-author", { hasText: "Alice" }).count(), 1, "a contiguous author should have one label");
     assert.equal(await page.locator(".cm-blame-author", { hasText: "Bob" }).count(), 1);
+  });
+});
+
+test("a blame reply that lands after further typing follows the edits and never breaks a keystroke", async () => {
+  await withEditor(async ({ page, base }) => {
+    await page.goto(`${base}/?e2e=1`);
+    await page.waitForFunction(() => document.querySelector("#sync-state")?.textContent === "Saved live");
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    let blameRequests = 0;
+    let release: (() => void) | undefined;
+    let held: Promise<void> | undefined;
+    await page.route(/\/v1\/blame\?/, async route => {
+      blameRequests += 1;
+      const response = await route.fetch();
+      const body = await response.json();
+      if (held) await held;
+      await route.fulfill({ response, json: body });
+    });
+    const place = () => page.evaluate(() => {
+      const { view } = globalThis.__paperE2E.state;
+      view.focus();
+      view.dispatch({ selection: { anchor: view.state.doc.length } });
+    });
+    // With blame mode off, typing and saving never ask the server who wrote what.
+    await place();
+    await page.keyboard.type("quiet");
+    await page.waitForFunction(() => document.querySelector("#sync-state")?.textContent === "Saved live");
+    await page.waitForTimeout(600);
+    assert.equal(blameRequests, 0);
+
+    // Hold the reply to the request blame mode sends, and keep editing meanwhile.
+    held = new Promise<void>(resolve => { release = resolve; });
+    await toggleBlame(page);
+    // The closing menu hands focus back to its button; wait for that before typing.
+    await page.waitForFunction(() => document.getElementById("toggle-blame") === null && document.activeElement?.id === "history-menu");
+    while (blameRequests < 1) await page.waitForTimeout(20);
+    await place();
+    await page.keyboard.type("ab");
+    for (let index = 0; index < 3; index += 1) await page.keyboard.press("Backspace");
+    release!();
+    held = undefined;
+    await page.locator(".cm-blame-author").first().waitFor();
+    // The stale reply described a longer text; the next keystroke must still land.
+    await page.keyboard.type("z");
+    const after = await page.evaluate(() => {
+      const { view } = globalThis.__paperE2E.state;
+      return { tail: view.state.doc.sliceString(view.state.doc.length - 5), head: view.state.selection.main.head, length: view.state.doc.length };
+    });
+    assert.deepEqual(errors, []);
+    assert.equal(after.tail, "quiez");
+    assert.equal(after.head, after.length);
+    await page.waitForFunction(() => document.querySelector("#sync-state")?.textContent === "Saved live");
+    const ranges = await page.evaluate(() => {
+      const { view } = globalThis.__paperE2E.state;
+      return Array.from(document.querySelectorAll(".cm-blame-range")).map(element => view.posAtDOM(element)).every(position => position <= view.state.doc.length);
+    });
+    assert.ok(ranges);
+
+    // A reply for a text this editor did not send its request from is ignored.
+    await page.unroute(/\/v1\/blame\?/);
+    await page.route(/\/v1\/blame\?/, route => route.fulfill({
+      contentType: "application/json",
+      json: { path: "main.tex", revision: "stale", runs: [{ from: 0, to: 4, authorId: "ghost", authorName: "Ghost", changeId: "ghost", createdAt: null, commit: null, gitAuthor: null }] },
+    }));
+    await page.keyboard.type("!");
+    await page.waitForTimeout(1500);
+    assert.equal(await page.locator(".cm-blame-author", { hasText: "Ghost" }).count(), 0);
+    assert.deepEqual(errors, []);
   });
 });
 

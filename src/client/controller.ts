@@ -17,7 +17,7 @@ import {
 import { tags } from "@lezer/highlight";
 import { stex } from "@codemirror/legacy-modes/mode/stex";
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
-import { Annotation, EditorSelection, EditorState, RangeSet, StateEffect, StateField, Transaction, type ChangeSet, type Extension, type Range, type Text, type TransactionSpec } from "@codemirror/state";
+import { Annotation, ChangeSet, EditorSelection, EditorState, RangeSet, StateEffect, StateField, Transaction, type Extension, type Range, type Text, type TransactionSpec } from "@codemirror/state";
 import {
   crosshairCursor,
   Decoration,
@@ -97,6 +97,7 @@ import { normalizeProjectPath, resolveGraphicsPath } from "../shared/assets.ts";
 import { buildDiagnostics, compileErrors } from "../shared/compile-errors.ts";
 import { latexDiagnostics } from "../shared/latex-diagnostics.ts";
 import { followLine } from "../shared/source-map.ts";
+import { sha256Hex } from "../shared/sha256.ts";
 import {
   flattenStructure,
   documentTitle,
@@ -1755,16 +1756,25 @@ class BlameAuthorWidget extends WidgetType {
   ignoreEvent(): boolean { return true; }
 }
 
+function clampBlameRun(run: BlameRun, length: number): BlameRun {
+  const from = Math.max(0, Math.min(run.from, length));
+  return { ...run, from, to: Math.max(from, Math.min(run.to, length)) };
+}
+
+// Ranges are clamped before they are mapped: a range that somehow outruns the
+// document must never make the user's next keystroke throw.
 const editorBlameField = StateField.define<BlameRun[]>({
   create: () => [],
   update(runs, transaction) {
-    for (const effect of transaction.effects) if (effect.is(setEditorBlame)) return effect.value;
+    for (const effect of transaction.effects) {
+      if (effect.is(setEditorBlame)) return effect.value.map(run => clampBlameRun(run, transaction.newDoc.length)).filter(run => run.to > run.from);
+    }
     if (!transaction.docChanged) return runs;
-    return runs.map(run => ({
-      ...run,
-      from: transaction.changes.mapPos(run.from, 1),
-      to: transaction.changes.mapPos(run.to, -1),
-    })).filter(run => run.to > run.from);
+    const length = transaction.startState.doc.length;
+    return runs.map(run => {
+      const clamped = clampBlameRun(run, length);
+      return { ...clamped, from: transaction.changes.mapPos(clamped.from, 1), to: transaction.changes.mapPos(clamped.to, -1) };
+    }).filter(run => run.to > run.from);
   },
 });
 
@@ -1820,24 +1830,60 @@ const editorBlameDecorations = ViewPlugin.fromClass(BlameDecorationsPlugin, {
 
 let blameRequestVersion = 0;
 let blameRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+let blameMismatches = 0;
+// The edits made since the pending blame request left. Over a slow network
+// the reply lands after further typing, so its ranges are mapped through
+// these edits instead of being placed where the text no longer is.
+let blameRequest: { view: EditorView; changes: ChangeSet } | null = null;
 
+function trackBlameRequestChanges(update: ViewUpdate): void {
+  if (!blameRequest || !update.docChanged || update.view !== blameRequest.view) return;
+  if (update.startState.doc.length !== blameRequest.changes.newLength) blameRequest = null;
+  else blameRequest.changes = blameRequest.changes.compose(update.changes);
+}
+
+/**
+ * Asks the server who wrote the open file. The reply describes the text the
+ * server held when it answered, which is only useful if that is the text this
+ * editor sent its request from: the revision check rejects replies for a text
+ * with edits still in flight in either direction, and a retry follows once
+ * those edits have settled.
+ */
 async function refreshEditorBlame(): Promise<void> {
   const view = state.view;
   const projectId = state.projectId;
   const relativePath = state.activeFile;
-  if (!view || !projectId || !relativePath) return;
+  if (!view || !projectId || !relativePath || !blameModeEnabled) return;
   const version = ++blameRequestVersion;
+  const requested = view.state.doc.toString();
+  blameRequest = { view, changes: ChangeSet.empty(requested.length) };
   try {
     const result = await request<{ path: string; revision: string; runs: BlameRun[] }>(`v1/blame?path=${encodeURIComponent(relativePath)}`);
     if (version !== blameRequestVersion || state.view !== view || state.projectId !== projectId || state.activeFile !== relativePath) return;
-    view.dispatch({ effects: setEditorBlame.of(result.runs) });
+    const changes = blameRequest?.view === view ? blameRequest.changes : null;
+    blameRequest = null;
+    if (!blameModeEnabled) return;
+    if (result.revision !== sha256Hex(requested)) {
+      if (blameMismatches < 3) {
+        blameMismatches += 1;
+        scheduleBlameRefresh(1000);
+      }
+      return;
+    }
+    blameMismatches = 0;
+    const runs = result.runs.map(run => clampBlameRun(run, requested.length)).map(run => changes
+      ? { ...run, from: changes.mapPos(run.from, 1), to: changes.mapPos(run.to, -1) }
+      : run).filter(run => run.to > run.from);
+    view.dispatch({ effects: setEditorBlame.of(runs) });
   } catch (error) {
     console.error("blame refresh failed", error);
   }
 }
 
+// Attribution is only shown in blame mode, so nothing is requested otherwise.
 function scheduleBlameRefresh(delay = 350): void {
   clearTimeout(blameRefreshTimer);
+  if (!blameModeEnabled) return;
   blameRefreshTimer = setTimeout(() => { void refreshEditorBlame(); }, delay);
 }
 
@@ -2062,6 +2108,7 @@ function editorExtensions(ytext: Y.Text, provider: Pick<WebsocketProvider, "awar
     keymap.of([...yUndoManagerKeymap, ...editorDefaultKeymap, ...searchKeymap, indentWithTab]),
     EditorView.lineWrapping,
     EditorView.updateListener.of(update => {
+      trackBlameRequestChanges(update);
       if (update.docChanged || update.selectionSet) {
         closeEditorContextMenu();
         closeLineContextMenu();
@@ -2197,7 +2244,9 @@ function setBlameMode(enabled: boolean): void {
   blameModeEnabled = enabled;
   syncBlameMenuItem();
   if (state.view) state.view.dispatch({ effects: setEditorBlameMode.of(enabled) });
+  blameMismatches = 0;
   if (enabled) void refreshEditorBlame();
+  else scheduleBlameRefresh();
 }
 
 function syncBlameMenuItem(): void {

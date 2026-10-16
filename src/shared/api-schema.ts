@@ -61,6 +61,12 @@ export const blameRunSchema = z.object({
   gitAuthor: z.object({ name: z.string(), email: z.string() }).nullable(),
 });
 export const blameResponseSchema = z.object({ path: z.string(), revision: z.string(), runs: z.array(blameRunSchema) });
+export const blameChangeSchema = z.object({
+  authorId: z.string(), authorName: z.string(), createdAt: z.number().nullable(), commit: z.string().nullable(),
+  gitAuthor: z.object({ name: z.string(), email: z.string() }).nullable(),
+});
+export const blameChangesRequestSchema = z.strictObject({ ids: z.array(z.string().min(1).max(64)).max(5000) });
+export const blameChangesResponseSchema = z.object({ changes: z.record(z.string(), blameChangeSchema) });
 
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 export type RegisterRequest = z.infer<typeof registerRequestSchema>;
@@ -70,3 +76,4 @@ export type ProjectFile = z.infer<typeof projectFileSchema>;
 export type EditorSettings = z.infer<typeof editorSettingsSchema>;
 export type ProjectSummary = z.infer<typeof projectSummarySchema>;
 export type BlameRun = z.infer<typeof blameRunSchema>;
+export type BlameChangeInfo = z.infer<typeof blameChangeSchema>;

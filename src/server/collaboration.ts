@@ -11,16 +11,13 @@ import { fileChanges } from "../shared/file-diff.ts";
 import { parseReviews } from "../shared/review.ts";
 import type { StateDatabase } from "./database.ts";
 import { agentAuthor, apiError, atomicWriteSync, isTextFile, isUnicodeBoundary, isWellFormedUtf16, MAX_PATCH_CHANGES, MAX_TEXT_BYTES, roomNameForPath, sha256 } from "./core.ts";
+import { attributedRuns, blameAttributes, LEGACY_ACTOR, LEGACY_CHANGE_ID, readBlameAttributes, type BlameAttribution } from "../shared/blame.ts";
 import type { BlameActor, BlameRun, CollaborationStore, EditMode, EditOptions, EditResult, PatchChange, SharedDocument } from "./types.ts";
 
 const MESSAGE_SYNC = 0;
 const MESSAGE_AWARENESS = 1;
 const MESSAGE_SAVED = 3;
-const BLAME_AUTHOR_ID = "lcAuthorId";
-const BLAME_AUTHOR_NAME = "lcAuthorName";
-const BLAME_CHANGE_ID = "lcChangeId";
 const BLAME_ORIGIN = Symbol("latexcoder-blame");
-const LEGACY_ACTOR: BlameActor = { id: "legacy", name: "Existing content" };
 
 type AttributionOrigin = { blameActor: BlameActor };
 type TextDelta = { retain?: number; delete?: number; insert?: string | object; attributes?: Record<string, unknown> };
@@ -36,7 +33,7 @@ function attributionFromOrigin(origin: unknown, connectionActors: WeakMap<WebSoc
 }
 
 function legacyAttributes(): Record<string, string> {
-  return { [BLAME_AUTHOR_ID]: LEGACY_ACTOR.id, [BLAME_AUTHOR_NAME]: LEGACY_ACTOR.name, [BLAME_CHANGE_ID]: "legacy" };
+  return blameAttributes({ authorId: LEGACY_ACTOR.id, authorName: LEGACY_ACTOR.name, changeId: LEGACY_CHANGE_ID });
 }
 
 export function createCollaborationStore(projectId: string, projectDir: string, database: StateDatabase, onChange: () => void = () => {}): CollaborationStore {
@@ -44,19 +41,24 @@ export function createCollaborationStore(projectId: string, projectDir: string, 
   const connectionShares = new WeakMap<WebSocket, string | null>();
   const connectionActors = new WeakMap<WebSocket, BlameActor>();
   const savedConnections = new WeakSet<WebSocket>();
+  // Change ids already written to the database, so the ids editors repeat
+  // with every keystroke do not each cost a write.
+  const knownChangeIds = new Set<string>();
   let shuttingDown = false, suspended = false;
 
-  function attributesForActor(actor: BlameActor): Record<string, string> {
-    const changeId = `ch_${randomUUID().replaceAll("-", "")}`;
+  function registerChange(attribution: BlameAttribution, commit: string | null = null): void {
+    if (attribution.changeId === LEGACY_CHANGE_ID || knownChangeIds.has(attribution.changeId)) return;
+    knownChangeIds.add(attribution.changeId);
     database.createBlameChange({
-      id: changeId, projectId, authorId: actor.id, authorName: actor.name,
-      createdAt: Date.now(), commit: actor.commit || null,
+      id: attribution.changeId, projectId, authorId: attribution.authorId, authorName: attribution.authorName,
+      createdAt: Date.now(), commit,
     });
-    return {
-      [BLAME_AUTHOR_ID]: actor.id,
-      [BLAME_AUTHOR_NAME]: actor.name,
-      [BLAME_CHANGE_ID]: changeId,
-    };
+  }
+
+  function attributesForActor(actor: BlameActor): Record<string, string> {
+    const attribution = { authorId: actor.id, authorName: actor.name, changeId: `ch_${randomUUID().replaceAll("-", "")}` };
+    registerChange(attribution, actor.commit || null);
+    return blameAttributes(attribution);
   }
 
   function acknowledge(shared: SharedDocument): void {
@@ -101,7 +103,7 @@ export function createCollaborationStore(projectId: string, projectDir: string, 
     doc.transact(() => {
       for (const operation of text.toDelta() as TextDelta[]) {
         if (typeof operation.insert !== "string") continue;
-        if (!operation.attributes?.[BLAME_CHANGE_ID]) {
+        if (!readBlameAttributes(operation.attributes)) {
           text.format(position, operation.insert.length, legacyAttributes());
           seededLegacy = true;
         }
@@ -117,18 +119,22 @@ export function createCollaborationStore(projectId: string, projectDir: string, 
       let index = 0;
       const inserted: Array<{ from: number; length: number }> = [];
       for (const operation of event.delta as TextDelta[]) {
+        // Editors attribute what they insert and format it with change ids of
+        // their own; registering those lets a checkpoint attach its commit.
+        const attribution = readBlameAttributes(operation.attributes);
+        if (attribution) registerChange(attribution);
         if (operation.retain) index += operation.retain;
         if (typeof operation.insert === "string") {
-          if (!operation.attributes?.[BLAME_CHANGE_ID]) inserted.push({ from: index, length: operation.insert.length });
+          if (!attribution) inserted.push({ from: index, length: operation.insert.length });
           index += operation.insert.length;
         }
       }
       if (!inserted.length) return;
+      // Text that arrived without any attribution is credited to the
+      // connection that sent it. An observer runs while Yjs is still
+      // finishing the originating update; defer once so BLAME_ORIGIN remains
+      // a distinct transaction.
       const attributes = attributesForActor(actor);
-      // An observer runs while Yjs is still finishing the originating update.
-      // A nested transaction is folded into that update and echoes the blame
-      // formatting back to its author. Defer once so BLAME_ORIGIN remains a
-      // distinct, server-only transaction.
       queueMicrotask(() => {
         if (shared?.removed || shuttingDown) return;
         doc.transact(() => {
@@ -137,14 +143,11 @@ export function createCollaborationStore(projectId: string, projectDir: string, 
       });
     });
     doc.on("update", (update: Uint8Array, origin: unknown) => {
-      // Attribution formatting is server-owned metadata. Sending it back to
-      // editors adds a non-text Yjs update after every insertion and can remap
-      // a local selection while the user is already typing or deleting.
-      if (origin !== BLAME_ORIGIN) {
-        const encoder = encoding.createEncoder();
-        encoding.writeVarUint(encoder, MESSAGE_SYNC); syncProtocol.writeUpdate(encoder, update);
-        broadcast(shared, encoding.toUint8Array(encoder), origin);
-      }
+      // Every update reaches the other editors, attribution formatting
+      // included, so each of them can show authorship from its own copy.
+      const encoder = encoding.createEncoder();
+      encoding.writeVarUint(encoder, MESSAGE_SYNC); syncProtocol.writeUpdate(encoder, update);
+      broadcast(shared, encoding.toUint8Array(encoder), origin);
       persist(shared);
       if (origin !== BLAME_ORIGIN && !suspended && !shuttingDown) onChange();
     });
@@ -329,25 +332,12 @@ export function createCollaborationStore(projectId: string, projectDir: string, 
   }
   function blame(relativePath: string): { revision: string; runs: BlameRun[] } {
     const text = load(relativePath).doc.getText("content");
-    const deltas = text.toDelta() as TextDelta[];
-    const changeIds = [...new Set(deltas.map(delta => delta.attributes?.[BLAME_CHANGE_ID]).filter((id): id is string => typeof id === "string" && id !== "legacy"))];
-    const changes = database.getBlameChanges(projectId, changeIds);
-    const runs: BlameRun[] = [];
-    let from = 0;
-    for (const delta of deltas) {
-      if (typeof delta.insert !== "string") continue;
-      const to = from + delta.insert.length;
-      const changeId = typeof delta.attributes?.[BLAME_CHANGE_ID] === "string" ? delta.attributes[BLAME_CHANGE_ID] : "legacy";
-      const change = changes.get(changeId);
-      runs.push({
-        from, to, changeId,
-        authorId: typeof delta.attributes?.[BLAME_AUTHOR_ID] === "string" ? delta.attributes[BLAME_AUTHOR_ID] : change?.authorId || LEGACY_ACTOR.id,
-        authorName: typeof delta.attributes?.[BLAME_AUTHOR_NAME] === "string" ? delta.attributes[BLAME_AUTHOR_NAME] : change?.authorName || LEGACY_ACTOR.name,
-        createdAt: change?.createdAt ?? null,
-        commit: change?.commit ?? null,
-      });
-      from = to;
-    }
+    const attributed = attributedRuns(text.toDelta() as TextDelta[]);
+    const changes = database.getBlameChanges(projectId, [...new Set(attributed.map(run => run.changeId).filter(id => id !== LEGACY_CHANGE_ID))]);
+    const runs: BlameRun[] = attributed.map(run => {
+      const change = changes.get(run.changeId);
+      return { ...run, createdAt: change?.createdAt ?? null, commit: change?.commit ?? null };
+    });
     return { revision: sha256(text.toString()), runs };
   }
   function shutdown(): void { flush(); shuttingDown = true; for (const shared of docs.values()) { if (shared.persistTimer) clearTimeout(shared.persistTimer); for (const connection of shared.connections.keys()) connection.terminate(); shared.doc.destroy(); } docs.clear(); }

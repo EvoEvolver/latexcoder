@@ -5,6 +5,7 @@ import * as encoding from "lib0/encoding";
 import { IndexeddbPersistence } from "y-indexeddb";
 import { WebsocketProvider } from "y-websocket";
 import * as Y from "yjs";
+import { BLAME_LOCAL_ORIGIN } from "./blame.ts";
 
 export type EditorSessionCallbacks = {
   onAwarenessChange: () => void;
@@ -67,7 +68,8 @@ export class EditorSession {
       }
     };
     this.doc.on("update", (_update, origin) => {
-      if (this.disposed || !options.editable || origin === this.provider || origin === this.persistence) return;
+      // Attribution formatting follows the text it describes; it needs no acknowledgement of its own.
+      if (this.disposed || !options.editable || origin === this.provider || origin === this.persistence || origin === BLAME_LOCAL_ORIGIN) return;
       this.nonce += 1;
       this.requestSave();
     });

@@ -4,10 +4,20 @@ import { lstat, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { createPatch } from "diff";
+import type { ZodType } from "zod";
+import { blameChangesRequestSchema, type BlameChangeInfo } from "../../shared/api-schema.ts";
 
 import { apiError, contentPath, isTextFile, MAX_FILE_BYTES, MAX_TEXT_BYTES, readProjectZip, safeRelativePath, sha256 } from "../core.ts";
 import { checkedContentTarget, contentEntries } from "../project-files.ts";
 import type { FileRouteContext, RouteApp } from "./types.ts";
+
+function parseBody<T>(schema: ZodType<T>, value: unknown): T {
+  const result = schema.safeParse(value);
+  if (result.success) return result.data;
+  throw apiError("invalid_request", "request body is invalid", 400, {
+    issues: result.error.issues.map(issue => ({ path: issue.path.join("."), message: issue.message })),
+  });
+}
 
 export function registerFileRoutes(app: RouteApp, context: FileRouteContext): void {
   const { database, json, raw } = context;
@@ -64,6 +74,24 @@ export function registerFileRoutes(app: RouteApp, context: FileRouteContext): vo
       const authors = new Map(await Promise.all(commits.map(async commit => [commit, await context.gitAuthorForCommit(runtime.projectDir, commit)] as const)));
       response.setHeader("Cache-Control", "no-store");
       response.json({ path: relativePath, revision: blame.revision, runs: blame.runs.map(run => ({ ...run, gitAuthor: run.commit ? authors.get(run.commit) || null : null })) });
+    } catch (error) { next(error); }
+  });
+  // Editors read authorship from their own copy of the text and only ask
+  // here for what the attributes cannot carry: when a change was made, the
+  // commit it landed in, and who committed it.
+  app.post("/v1/blame/changes", json({ limit: "512kb" }), async (request, response, next) => {
+    try {
+      const runtime = await context.resolveProject(request);
+      const { ids } = parseBody(blameChangesRequestSchema, request.body);
+      const records = database.getBlameChanges(runtime.id, [...new Set(ids)]);
+      const commits = [...new Set([...records.values()].map(change => change.commit).filter((commit): commit is string => Boolean(commit)))];
+      const authors = new Map(await Promise.all(commits.map(async commit => [commit, await context.gitAuthorForCommit(runtime.projectDir, commit)] as const)));
+      const changes: Record<string, BlameChangeInfo> = {};
+      for (const [id, change] of records) {
+        changes[id] = { authorId: change.authorId, authorName: change.authorName, createdAt: change.createdAt, commit: change.commit, gitAuthor: change.commit ? authors.get(change.commit) || null : null };
+      }
+      response.setHeader("Cache-Control", "no-store");
+      response.json({ changes });
     } catch (error) { next(error); }
   });
   app.put("/v1/files", raw({ type: () => true, limit: MAX_FILE_BYTES }), async (request, response, next) => {

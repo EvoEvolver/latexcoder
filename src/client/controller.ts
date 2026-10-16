@@ -17,7 +17,7 @@ import {
 import { tags } from "@lezer/highlight";
 import { stex } from "@codemirror/legacy-modes/mode/stex";
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
-import { Annotation, ChangeSet, EditorSelection, EditorState, RangeSet, StateEffect, StateField, Transaction, type Extension, type Range, type Text, type TransactionSpec } from "@codemirror/state";
+import { Annotation, EditorSelection, EditorState, RangeSet, StateEffect, StateField, Transaction, type ChangeSet, type Extension, type Range, type Text, type TransactionSpec } from "@codemirror/state";
 import {
   crosshairCursor,
   Decoration,
@@ -97,7 +97,8 @@ import { normalizeProjectPath, resolveGraphicsPath } from "../shared/assets.ts";
 import { buildDiagnostics, compileErrors } from "../shared/compile-errors.ts";
 import { latexDiagnostics } from "../shared/latex-diagnostics.ts";
 import { followLine } from "../shared/source-map.ts";
-import { sha256Hex } from "../shared/sha256.ts";
+import type { BlameChangeInfo } from "../shared/api-schema.ts";
+import { attributeLocalEdits, blameRunsOf, createBlameChangeStore, type BlameChangeStore } from "./blame.ts";
 import {
   flattenStructure,
   documentTitle,
@@ -1828,63 +1829,51 @@ const editorBlameDecorations = ViewPlugin.fromClass(BlameDecorationsPlugin, {
   decorations: plugin => plugin.decorations,
 });
 
-let blameRequestVersion = 0;
-let blameRefreshTimer: ReturnType<typeof setTimeout> | undefined;
-let blameMismatches = 0;
-// The edits made since the pending blame request left. Over a slow network
-// the reply lands after further typing, so its ranges are mapped through
-// these edits instead of being placed where the text no longer is.
-let blameRequest: { view: EditorView; changes: ChangeSet } | null = null;
+let blameRenderTimer: ReturnType<typeof setTimeout> | undefined;
+let blameCommitTimer: ReturnType<typeof setTimeout> | undefined;
+let blameCommitPoll: ReturnType<typeof setInterval> | undefined;
+let blameStore: { projectId: string; store: BlameChangeStore } | null = null;
+let stopLocalAttribution: (() => void) | null = null;
 
-function trackBlameRequestChanges(update: ViewUpdate): void {
-  if (!blameRequest || !update.docChanged || update.view !== blameRequest.view) return;
-  if (update.startState.doc.length !== blameRequest.changes.newLength) blameRequest = null;
-  else blameRequest.changes = blameRequest.changes.compose(update.changes);
+function blameChanges(): BlameChangeStore {
+  if (!blameStore || blameStore.projectId !== state.projectId) {
+    blameStore = {
+      projectId: state.projectId,
+      store: createBlameChangeStore(async ids => (await request<{ changes: Record<string, BlameChangeInfo> }>("v1/blame/changes", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }),
+      })).changes, () => scheduleBlameRender(0)),
+    };
+  }
+  return blameStore.store;
 }
 
 /**
- * Asks the server who wrote the open file. The reply describes the text the
- * server held when it answered, which is only useful if that is the text this
- * editor sent its request from: the revision check rejects replies for a text
- * with edits still in flight in either direction, and a retry follows once
- * those edits have settled.
+ * Shows who wrote what from the attribution carried by the text itself, so
+ * local typing is labelled at once and nothing is asked of the server but
+ * the commit each change later reached.
  */
-async function refreshEditorBlame(): Promise<void> {
+function renderEditorBlame(): void {
   const view = state.view;
-  const projectId = state.projectId;
-  const relativePath = state.activeFile;
-  if (!view || !projectId || !relativePath || !blameModeEnabled) return;
-  const version = ++blameRequestVersion;
-  const requested = view.state.doc.toString();
-  blameRequest = { view, changes: ChangeSet.empty(requested.length) };
-  try {
-    const result = await request<{ path: string; revision: string; runs: BlameRun[] }>(`v1/blame?path=${encodeURIComponent(relativePath)}`);
-    if (version !== blameRequestVersion || state.view !== view || state.projectId !== projectId || state.activeFile !== relativePath) return;
-    const changes = blameRequest?.view === view ? blameRequest.changes : null;
-    blameRequest = null;
-    if (!blameModeEnabled) return;
-    if (result.revision !== sha256Hex(requested)) {
-      if (blameMismatches < 3) {
-        blameMismatches += 1;
-        scheduleBlameRefresh(1000);
-      }
-      return;
-    }
-    blameMismatches = 0;
-    const runs = result.runs.map(run => clampBlameRun(run, requested.length)).map(run => changes
-      ? { ...run, from: changes.mapPos(run.from, 1), to: changes.mapPos(run.to, -1) }
-      : run).filter(run => run.to > run.from);
-    view.dispatch({ effects: setEditorBlame.of(runs) });
-  } catch (error) {
-    console.error("blame refresh failed", error);
-  }
+  const doc = state.doc;
+  if (!view || !doc || !blameModeEnabled) return;
+  const store = blameChanges();
+  const runs = blameRunsOf(doc.getText("content"), store.changes);
+  view.dispatch({ effects: setEditorBlame.of(runs) });
+  void store.ensure(runs.map(run => run.changeId)).catch(error => console.error("blame lookup failed", error));
 }
 
-// Attribution is only shown in blame mode, so nothing is requested otherwise.
-function scheduleBlameRefresh(delay = 350): void {
-  clearTimeout(blameRefreshTimer);
+function scheduleBlameRender(delay = 200): void {
+  clearTimeout(blameRenderTimer);
   if (!blameModeEnabled) return;
-  blameRefreshTimer = setTimeout(() => { void refreshEditorBlame(); }, delay);
+  blameRenderTimer = setTimeout(renderEditorBlame, delay);
+}
+
+// Changes reach a commit at checkpoints on the server; the uncommitted ones
+// are asked about again after saves, project events, and now and then.
+function scheduleBlameCommitRefresh(delay = 1000): void {
+  clearTimeout(blameCommitTimer);
+  if (!blameModeEnabled || !state.view) return;
+  blameCommitTimer = setTimeout(() => { void blameChanges().refreshPending().catch(error => console.error("blame refresh failed", error)); }, delay);
 }
 
 function positionedDiagnostic(diagnostic: BuildDiagnostic, source: Text, lineNumber: number): PositionedDiagnostic | null {
@@ -2108,7 +2097,6 @@ function editorExtensions(ytext: Y.Text, provider: Pick<WebsocketProvider, "awar
     keymap.of([...yUndoManagerKeymap, ...editorDefaultKeymap, ...searchKeymap, indentWithTab]),
     EditorView.lineWrapping,
     EditorView.updateListener.of(update => {
-      trackBlameRequestChanges(update);
       if (update.docChanged || update.selectionSet) {
         closeEditorContextMenu();
         closeLineContextMenu();
@@ -2118,7 +2106,6 @@ function editorExtensions(ytext: Y.Text, provider: Pick<WebsocketProvider, "awar
         markPdfStale();
         scheduleStaticDiagnostics();
         scheduleAutoCompile();
-        scheduleBlameRefresh();
       }
       if (update.docChanged || update.selectionSet || update.viewportChanged || update.geometryChanged) {
         queueMicrotask(renderSelectionActions);
@@ -2187,6 +2174,10 @@ function disconnectEditor() {
   clearTimeout(editorScrollTimer);
   closeTreeWriterEditor();
   closeEditorContextMenu();
+  stopLocalAttribution?.();
+  stopLocalAttribution = null;
+  clearTimeout(blameRenderTimer);
+  clearTimeout(blameCommitTimer);
   if (editorSession) editorSession.dispose();
   else {
     // Tests can install an in-memory editor without a websocket session.
@@ -2199,8 +2190,6 @@ function disconnectEditor() {
   state.persistence = null;
   clearTimeout(autoCompileTimer);
   clearTimeout(staticDiagnosticTimer);
-  clearTimeout(blameRefreshTimer);
-  blameRequestVersion += 1;
   staticDiagnosticVersion += 1;
   state.provider = null;
   state.view = null;
@@ -2244,9 +2233,13 @@ function setBlameMode(enabled: boolean): void {
   blameModeEnabled = enabled;
   syncBlameMenuItem();
   if (state.view) state.view.dispatch({ effects: setEditorBlameMode.of(enabled) });
-  blameMismatches = 0;
-  if (enabled) void refreshEditorBlame();
-  else scheduleBlameRefresh();
+  clearInterval(blameCommitPoll);
+  clearTimeout(blameRenderTimer);
+  clearTimeout(blameCommitTimer);
+  if (!enabled) return;
+  renderEditorBlame();
+  scheduleBlameCommitRefresh(0);
+  blameCommitPoll = setInterval(() => scheduleBlameCommitRefresh(0), 60_000);
 }
 
 function syncBlameMenuItem(): void {
@@ -2510,11 +2503,12 @@ async function openFile(relativePath: string, options: { keepAuxiliary?: boolean
     localStorage.setItem("latexcoder-guest-author-id", guestAuthorId);
   }
   let scrollRestored = false;
+  const identity = { authorId: state.user?.username || guestAuthorId, authorName: displayName() };
   const session = new EditorSession({
     socketUrl: socketUrl(`v1/collab/${encodeURIComponent(state.projectId)}`),
     room: encodeRoom(relativePath),
-    authorId: state.user?.username || guestAuthorId,
-    authorName: displayName(),
+    authorId: identity.authorId,
+    authorName: identity.authorName,
     editable: state.projectCanEdit,
     persistenceKey: `project:${state.projectId}:${relativePath}`,
     parent: elements.editor,
@@ -2524,7 +2518,7 @@ async function openFile(relativePath: string, options: { keepAuxiliary?: boolean
       onSaved: () => {
         if (editorSession !== session) return;
         updateSyncStatus();
-        scheduleBlameRefresh(0);
+        scheduleBlameCommitRefresh();
       },
       onStatusChange: () => { if (editorSession === session) updateSyncStatus(); },
       onUnsavedChange: unsaved => { state.unsaved = unsaved; },
@@ -2543,7 +2537,8 @@ async function openFile(relativePath: string, options: { keepAuxiliary?: boolean
         if (!reconnected) applyEditorDiagnostics("compiler");
         applyEditorDiagnostics("static");
         scheduleAutoCompile();
-        scheduleBlameRefresh(0);
+        scheduleBlameRender(0);
+        scheduleBlameCommitRefresh(0);
       },
     },
   });
@@ -2552,6 +2547,9 @@ async function openFile(relativePath: string, options: { keepAuxiliary?: boolean
   state.provider = session.provider;
   state.persistence = session.persistence;
   state.view = session.view;
+  stopLocalAttribution?.();
+  stopLocalAttribution = attributeLocalEdits(session.text, () => state.projectCanEdit && editorSession === session ? identity : null);
+  session.text.observe(() => { if (editorSession === session) scheduleBlameRender(); });
   syncMarkdownView();
   bindEditorScroll(session.view, state.projectId, relativePath);
   updateSyncStatus();
@@ -3438,6 +3436,7 @@ function watchProjectFiles(): void {
   let refreshing = false;
   let pending = false;
   source.addEventListener("files", async () => {
+    scheduleBlameCommitRefresh(0);
     pending = true;
     if (refreshing) return;
     refreshing = true;
@@ -3797,7 +3796,7 @@ async function runGitAction(endpoint: string, body: Record<string, unknown>, suc
     });
     if (["fast_forward", "merged"].includes(result.git.status)) await refreshProject(true);
     await refreshGit();
-    await refreshEditorBlame();
+    scheduleBlameCommitRefresh(0);
     await versionHistory.refresh();
     showToast(result.git.status === "conflict" ? t("Conflict saved to {{v0}}.", { v0: result.git.conflict.branch }) : successMessage);
     return result;

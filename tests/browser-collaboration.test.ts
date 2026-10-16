@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -42,6 +41,8 @@ test("Git pushes update the open browser file tree without reloading the editor"
       await toggleBlame(page);
       const pushedAuthor = page.locator(".cm-blame-author", { hasText: "Test User" }).first();
       await pushedAuthor.waitFor();
+      // Commit details arrive from the server after the label itself.
+      await page.waitForFunction(() => document.querySelector(".cm-blame-author")?.getAttribute("title")?.includes("Commit "));
       assert.match(await pushedAuthor.getAttribute("title"), /Git author: Test <test@example\.com>.*Commit [0-9a-f]{7}/);
       await toggleBlame(page);
       await page.locator("#file-list").getByText("main.tex", { exact: true }).click();
@@ -259,8 +260,14 @@ test("collaborative edits show attributed ranges in blame mode", async () => {
       const view = globalThis.__paperE2E.state.view;
       view.dispatch({ changes: { from: 0, insert: "% blame marker\n" } });
     });
+    // The editor attributed its own insertion; the server saw it in the same update stream.
+    const attributed = await page.evaluate(() => globalThis.__paperE2E.state.doc.getText("content").toDelta()[0].attributes);
+    assert.equal(attributed.lcAuthorId, "test-user");
+    assert.equal(attributed.lcAuthorName, "Test User");
+    assert.match(attributed.lcChangeId, /^ch_[0-9a-f]{32}$/);
+    await page.waitForFunction(() => document.querySelector("#sync-state")?.textContent === "Saved live");
     const blame = await (await fetch(`${base}/v1/blame?path=main.tex`)).json();
-    assert.ok(blame.runs.some(run => run.authorId === "test-user" && run.authorName === "Test User"));
+    assert.ok(blame.runs.some(run => run.authorId === "test-user" && run.authorName === "Test User" && run.changeId === attributed.lcChangeId));
 
     await toggleBlame(page);
     const author = page.locator(".cm-blame-author", { hasText: "Test User" }).first();
@@ -275,96 +282,88 @@ test("collaborative edits show attributed ranges in blame mode", async () => {
     await page.locator("#toggle-blame").click();
     assert.equal(await page.locator(".cm-blame-author").count(), 0);
 
-    const source = await page.evaluate(() => globalThis.__paperE2E.state.view.state.doc.toString());
-    await page.route(/\/v1\/blame\?/, async route => {
+    // Attribution lives in the text; only commit details come from the server.
+    await page.evaluate(() => {
+      const text = globalThis.__paperE2E.state.doc.getText("content");
+      text.format(0, 4, { lcAuthorId: "alice", lcAuthorName: "Alice", lcChangeId: "change-1" });
+      text.format(4, 4, { lcAuthorId: "alice", lcAuthorName: "Alice", lcChangeId: "change-2" });
+      text.format(8, 4, { lcAuthorId: "bob", lcAuthorName: "Bob", lcChangeId: "change-3" });
+    });
+    await page.route(/\/v1\/blame\/changes/, async route => {
       await route.fulfill({
         contentType: "application/json",
         json: {
-          path: "main.tex",
-          revision: createHash("sha256").update(source).digest("hex"),
-          runs: [
-            { from: 0, to: 4, authorId: "alice", authorName: "Alice", changeId: "change-1", createdAt: 1, commit: "1111111", gitAuthor: null },
-            { from: 4, to: 8, authorId: "alice", authorName: "Alice", changeId: "change-2", createdAt: 2, commit: "2222222", gitAuthor: null },
-            { from: 8, to: 12, authorId: "bob", authorName: "Bob", changeId: "change-3", createdAt: 3, commit: null, gitAuthor: null },
-          ],
+          changes: {
+            "change-1": { authorId: "alice", authorName: "Alice", createdAt: 1, commit: "1111111", gitAuthor: null },
+            "change-2": { authorId: "alice", authorName: "Alice", createdAt: 2, commit: "2222222", gitAuthor: null },
+            "change-3": { authorId: "bob", authorName: "Bob", createdAt: 3, commit: null, gitAuthor: null },
+          },
         },
       });
     });
     await toggleBlame(page);
     await page.locator(".cm-blame-author", { hasText: "Alice" }).waitFor();
-    assert.equal(await page.locator(".cm-blame-range").count(), 3, "commit-specific blame ranges should remain separate");
+    await page.waitForFunction(() => Array.from(document.querySelectorAll(".cm-blame-author")).some(label => label.getAttribute("title")?.includes("Commit 1111111")));
     assert.equal(await page.locator(".cm-blame-author", { hasText: "Alice" }).count(), 1, "a contiguous author should have one label");
     assert.equal(await page.locator(".cm-blame-author", { hasText: "Bob" }).count(), 1);
+    const ranges = await page.locator(".cm-blame-range").count();
+    assert.ok(ranges >= 3, `commit-specific blame ranges should remain separate, saw ${ranges}`);
   });
 });
 
-test("a blame reply that lands after further typing follows the edits and never breaks a keystroke", async () => {
-  await withEditor(async ({ page, base }) => {
+test("blame mode labels typing at once without asking the server and picks up the commit later", async () => {
+  await withEditor(async ({ page, base, browser }) => {
     await page.goto(`${base}/?e2e=1`);
     await page.waitForFunction(() => document.querySelector("#sync-state")?.textContent === "Saved live");
     const errors: string[] = [];
     page.on("pageerror", error => errors.push(error.message));
     let blameRequests = 0;
-    let release: (() => void) | undefined;
-    let held: Promise<void> | undefined;
-    await page.route(/\/v1\/blame\?/, async route => {
-      blameRequests += 1;
-      const response = await route.fetch();
-      const body = await response.json();
-      if (held) await held;
-      await route.fulfill({ response, json: body });
-    });
+    await page.route(/\/v1\/blame\?/, route => { blameRequests += 1; return route.continue(); });
     const place = () => page.evaluate(() => {
       const { view } = globalThis.__paperE2E.state;
       view.focus();
       view.dispatch({ selection: { anchor: view.state.doc.length } });
     });
-    // With blame mode off, typing and saving never ask the server who wrote what.
+    await toggleBlame(page);
+    await page.waitForFunction(() => document.getElementById("toggle-blame") === null && document.activeElement?.id === "history-menu");
     await place();
-    await page.keyboard.type("quiet");
-    await page.waitForFunction(() => document.querySelector("#sync-state")?.textContent === "Saved live");
-    await page.waitForTimeout(600);
+    await page.keyboard.type("typed by me");
+    // The label is there before any save acknowledgement could have returned.
+    const label = page.locator(".cm-blame-author", { hasText: "Test User" }).last();
+    await label.waitFor({ timeout: 1000 });
+    assert.match(await label.getAttribute("title"), /Uncommitted$/);
+    await page.keyboard.press("Backspace");
+    await page.keyboard.type("e");
+    const tail = await page.evaluate(() => {
+      const { view, doc } = globalThis.__paperE2E.state;
+      const delta = doc.getText("content").toDelta();
+      return { text: view.state.doc.sliceString(view.state.doc.length - 11), head: view.state.selection.main.head, length: view.state.doc.length, last: delta[delta.length - 1] };
+    });
+    assert.equal(tail.text, "typed by me");
+    assert.equal(tail.head, tail.length);
+    assert.equal(tail.last.attributes.lcAuthorId, "test-user");
     assert.equal(blameRequests, 0);
 
-    // Hold the reply to the request blame mode sends, and keep editing meanwhile.
-    held = new Promise<void>(resolve => { release = resolve; });
-    await toggleBlame(page);
-    // The closing menu hands focus back to its button; wait for that before typing.
-    await page.waitForFunction(() => document.getElementById("toggle-blame") === null && document.activeElement?.id === "history-menu");
-    while (blameRequests < 1) await page.waitForTimeout(20);
-    await place();
-    await page.keyboard.type("ab");
-    for (let index = 0; index < 3; index += 1) await page.keyboard.press("Backspace");
-    release!();
-    held = undefined;
-    await page.locator(".cm-blame-author").first().waitFor();
-    // The stale reply described a longer text; the next keystroke must still land.
-    await page.keyboard.type("z");
-    const after = await page.evaluate(() => {
-      const { view } = globalThis.__paperE2E.state;
-      return { tail: view.state.doc.sliceString(view.state.doc.length - 5), head: view.state.selection.main.head, length: view.state.doc.length };
-    });
-    assert.deepEqual(errors, []);
-    assert.equal(after.tail, "quiez");
-    assert.equal(after.head, after.length);
-    await page.waitForFunction(() => document.querySelector("#sync-state")?.textContent === "Saved live");
-    const ranges = await page.evaluate(() => {
-      const { view } = globalThis.__paperE2E.state;
-      return Array.from(document.querySelectorAll(".cm-blame-range")).map(element => view.posAtDOM(element)).every(position => position <= view.state.doc.length);
-    });
-    assert.ok(ranges);
+    // A second editor sees the attribution arrive with the text.
+    const other = await browser.newPage();
+    try {
+      await other.goto(page.url());
+      await other.waitForFunction(() => document.querySelector("#sync-state")?.textContent === "Saved live");
+      await other.waitForFunction(() => {
+        const delta = globalThis.__paperE2E.state.doc.getText("content").toDelta();
+        return delta.some(op => typeof op.insert === "string" && op.insert.includes("typed by me") && op.attributes?.lcAuthorName === "Test User");
+      });
+    } finally { await other.close(); }
 
-    // A reply for a text this editor did not send its request from is ignored.
-    await page.unroute(/\/v1\/blame\?/);
-    await page.route(/\/v1\/blame\?/, route => route.fulfill({
-      contentType: "application/json",
-      json: { path: "main.tex", revision: "stale", runs: [{ from: 0, to: 4, authorId: "ghost", authorName: "Ghost", changeId: "ghost", createdAt: null, commit: null, gitAuthor: null }] },
-    }));
-    await page.keyboard.type("!");
-    await page.waitForTimeout(1500);
-    assert.equal(await page.locator(".cm-blame-author", { hasText: "Ghost" }).count(), 0);
+    // Once a checkpoint lands, the next refresh shows the commit.
+    await page.waitForFunction(() => document.querySelector("#sync-state")?.textContent === "Saved live");
+    const checkpoint = await fetch(`${base}/v1/git/commit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: "Keep the typed text" }) });
+    assert.equal(checkpoint.status, 200);
+    const commit = (await checkpoint.json()).git.commit;
+    await page.keyboard.type(".");
+    await page.waitForFunction(commit => Array.from(document.querySelectorAll(".cm-blame-author")).some(label => label.getAttribute("title")?.includes(`Commit ${commit.slice(0, 7)}`)), commit);
     assert.deepEqual(errors, []);
-  });
+  }, { gitCheckpointIdleMs: 3_600_000, gitCheckpointMaxWaitMs: 3_600_000 });
 });
 
 test("rapid typing followed by Backspace stays deleted after collaboration updates", async () => {

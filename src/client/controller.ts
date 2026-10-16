@@ -17,7 +17,7 @@ import {
 import { tags } from "@lezer/highlight";
 import { stex } from "@codemirror/legacy-modes/mode/stex";
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
-import { Annotation, EditorSelection, EditorState, RangeSet, StateEffect, StateField, Transaction, type Extension, type Range, type TransactionSpec } from "@codemirror/state";
+import { Annotation, EditorSelection, EditorState, RangeSet, StateEffect, StateField, Transaction, type ChangeSet, type Extension, type Range, type Text, type TransactionSpec } from "@codemirror/state";
 import {
   crosshairCursor,
   Decoration,
@@ -96,6 +96,7 @@ import { referenceDefinition, type ReferenceLink } from "../shared/references.ts
 import { normalizeProjectPath, resolveGraphicsPath } from "../shared/assets.ts";
 import { buildDiagnostics, compileErrors } from "../shared/compile-errors.ts";
 import { latexDiagnostics } from "../shared/latex-diagnostics.ts";
+import { followLine } from "../shared/source-map.ts";
 import {
   flattenStructure,
   documentTitle,
@@ -1598,7 +1599,12 @@ async function followReference(link: ReferenceLink) {
 }
 
 type PositionedDiagnostic = BuildDiagnostic & { from: number; to: number };
-const setEditorDiagnostics = StateEffect.define<PositionedDiagnostic[]>();
+type DiagnosticGroup = "static" | "compiler";
+const setEditorDiagnostics = StateEffect.define<{ group: DiagnosticGroup; diagnostics: PositionedDiagnostic[] }>();
+
+function diagnosticGroup(diagnostic: BuildDiagnostic): DiagnosticGroup {
+  return diagnostic.source === "latex" ? "static" : "compiler";
+}
 
 class DiagnosticLineNumberMarker extends GutterMarker {
   readonly elementClass: string = "";
@@ -1623,16 +1629,39 @@ function diagnosticLineMarkers(state: EditorState, diagnostics: PositionedDiagno
   return RangeSet.of([...byLine.entries()].map(([line, severity]) => new DiagnosticLineNumberMarker(severity).range(line)), true);
 }
 
+// Diagnostic ranges live in the editor state and follow every edit, local or
+// remote, so an underline elsewhere in the file never moves while someone
+// types. A compiler diagnostic whose range is edited is being fixed: it goes
+// away until the next build reports it again. Static checks are recomputed
+// from the new text shortly after the edit and replaced as a group.
+function followDiagnostics(diagnostics: PositionedDiagnostic[], changes: ChangeSet): PositionedDiagnostic[] {
+  const next: PositionedDiagnostic[] = [];
+  let changed = false;
+  for (const diagnostic of diagnostics) {
+    let touched = false;
+    changes.iterChangedRanges((fromA, toA) => {
+      if (fromA === toA ? fromA >= diagnostic.from && fromA <= diagnostic.to : fromA < diagnostic.to && toA > diagnostic.from) touched = true;
+    });
+    if (touched && diagnosticGroup(diagnostic) === "compiler") { changed = true; continue; }
+    const from = changes.mapPos(diagnostic.from, 1);
+    const to = changes.mapPos(diagnostic.to, -1);
+    if (from === diagnostic.from && to === diagnostic.to) { next.push(diagnostic); continue; }
+    changed = true;
+    if (to > from) next.push({ ...diagnostic, from, to });
+  }
+  return changed ? next : diagnostics;
+}
+
 const editorDiagnosticField = StateField.define<EditorDiagnosticState>({
   create: () => ({ diagnostics: [], lineMarkers: RangeSet.empty }),
   update(value, transaction) {
-    let diagnostics = value.diagnostics;
-    for (const effect of transaction.effects) if (effect.is(setEditorDiagnostics)) diagnostics = effect.value;
-    if (transaction.docChanged && diagnostics === value.diagnostics) diagnostics = diagnostics.map(diagnostic => ({
-      ...diagnostic,
-      from: transaction.changes.mapPos(diagnostic.from),
-      to: transaction.changes.mapPos(diagnostic.to),
-    }));
+    let diagnostics = transaction.docChanged ? followDiagnostics(value.diagnostics, transaction.changes) : value.diagnostics;
+    for (const effect of transaction.effects) {
+      if (!effect.is(setEditorDiagnostics)) continue;
+      const { group } = effect.value;
+      diagnostics = [...diagnostics.filter(diagnostic => diagnosticGroup(diagnostic) !== group), ...effect.value.diagnostics];
+    }
+    if (diagnostics === value.diagnostics) return value;
     return { diagnostics, lineMarkers: diagnosticLineMarkers(transaction.state, diagnostics) };
   },
   provide: field => [
@@ -1799,34 +1828,50 @@ function scheduleBlameRefresh(delay = 350): void {
   blameRefreshTimer = setTimeout(() => { void refreshEditorBlame(); }, delay);
 }
 
-function navigableDiagnostics(): BuildDiagnostic[] {
+function positionedDiagnostic(diagnostic: BuildDiagnostic, source: Text, lineNumber: number): PositionedDiagnostic | null {
+  const line = source.line(Math.max(1, Math.min(source.lines, lineNumber)));
+  const exact = diagnostic.source === "latex" && diagnostic.from !== undefined && diagnostic.to !== undefined
+    && diagnostic.from >= line.from && diagnostic.to <= line.to;
+  const firstContent = line.text.search(/\S/);
+  const from = Math.min(exact ? diagnostic.from! : firstContent < 0 ? line.from : line.from + firstContent, source.length);
+  const to = Math.min(Math.max(from + 1, exact ? diagnostic.to! : line.to), source.length);
+  return to > from ? { ...diagnostic, from, to } : null;
+}
+
+// The text each file had when the current build started, so a build result
+// that arrives after further typing lands on the lines it describes.
+const compiledSources = new Map<string, string>();
+
+/**
+ * Places one group of diagnostics for the open file. Static checks are only
+ * placed when they were computed from the text the editor shows; otherwise a
+ * recomputation is already scheduled and the ranges already in the editor
+ * keep following the edits until it lands.
+ */
+function applyEditorDiagnostics(group: DiagnosticGroup): void {
+  const view = state.view;
+  if (!view) return;
+  const source = view.state.doc;
+  const current = source.toString();
+  let mapLine = (line: number): number => line;
+  if (group === "static") {
+    if (staticSourceCache.get(state.activeFile) !== current) return;
+  } else {
+    const compiled = compiledSources.get(state.activeFile);
+    if (compiled !== undefined && compiled !== current) mapLine = line => followLine(compiled, current, line);
+  }
   const seen = new Set<string>();
-  return [...state.compileDiagnostics, ...state.staticDiagnostics]
-    .filter((diagnostic): diagnostic is BuildDiagnostic & { path: string; line: number } => Boolean(diagnostic.path && diagnostic.line))
+  const diagnostics = (group === "static" ? state.staticDiagnostics : state.compileDiagnostics)
+    .filter((diagnostic): diagnostic is BuildDiagnostic & { path: string; line: number } => diagnostic.path === state.activeFile && Boolean(diagnostic.line))
     .filter(diagnostic => {
-      const key = `${diagnostic.path}:${diagnostic.line}:${diagnostic.message}`;
+      const key = `${diagnostic.line}:${diagnostic.message}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     })
-    .sort((left, right) => Number(left.severity === "warning") - Number(right.severity === "warning")
-      || left.path.localeCompare(right.path) || left.line - right.line || (left.from || 0) - (right.from || 0));
-}
-
-function applyEditorDiagnostics(): void {
-  const diagnostics = navigableDiagnostics();
-  if (!state.view) return;
-  const source = state.view.state.doc;
-  const active = diagnostics.filter(diagnostic => diagnostic.path === state.activeFile).map(diagnostic => {
-    const line = source.line(Math.max(1, Math.min(source.lines, diagnostic.line!)));
-    const exact = diagnostic.source === "latex" && diagnostic.from !== undefined && diagnostic.to !== undefined
-      && diagnostic.from >= line.from && diagnostic.to <= line.to;
-    const firstContent = line.text.search(/\S/);
-    const from = exact ? diagnostic.from! : firstContent < 0 ? line.from : line.from + firstContent;
-    const to = exact ? diagnostic.to! : Math.max(from + 1, line.to);
-    return { ...diagnostic, from: Math.min(from, source.length), to: Math.min(Math.max(from + 1, to), source.length) };
-  }).filter(diagnostic => diagnostic.to > diagnostic.from);
-  state.view.dispatch({ effects: setEditorDiagnostics.of(active) });
+    .map(diagnostic => positionedDiagnostic(diagnostic, source, mapLine(diagnostic.line)))
+    .filter((diagnostic): diagnostic is PositionedDiagnostic => diagnostic !== null);
+  view.dispatch({ effects: setEditorDiagnostics.of({ group, diagnostics }) });
 }
 
 let staticDiagnosticTimer: ReturnType<typeof setTimeout> | undefined;
@@ -1857,7 +1902,7 @@ async function refreshStaticDiagnostics(): Promise<void> {
   }));
   if (version !== staticDiagnosticVersion || project !== state.projectId) return;
   state.staticDiagnostics = latexDiagnostics(sources);
-  applyEditorDiagnostics();
+  applyEditorDiagnostics("static");
 }
 
 function scheduleStaticDiagnostics(): void {
@@ -2011,9 +2056,7 @@ function editorExtensions(ytext: Y.Text, provider: Pick<WebsocketProvider, "awar
       if (update.docChanged) {
         queueReviewRender();
         markPdfStale();
-        state.compileDiagnostics = state.compileDiagnostics.filter(diagnostic => diagnostic.path !== state.activeFile);
         scheduleStaticDiagnostics();
-        queueMicrotask(applyEditorDiagnostics);
         scheduleAutoCompile();
         scheduleBlameRefresh();
       }
@@ -2432,7 +2475,10 @@ async function openFile(relativePath: string, options: { keepAuxiliary?: boolean
         if (reconnected) void refreshProjectFiles(state.projectId).catch(error => console.error("Project file refresh after reconnect failed", error));
         renderReviews();
         scheduleStaticDiagnostics();
-        applyEditorDiagnostics();
+        // After a reconnect the ranges already in the editor followed the
+        // merged edits; placing the build result again by line would not.
+        if (!reconnected) applyEditorDiagnostics("compiler");
+        applyEditorDiagnostics("static");
         scheduleAutoCompile();
         scheduleBlameRefresh(0);
       },
@@ -2446,7 +2492,6 @@ async function openFile(relativePath: string, options: { keepAuxiliary?: boolean
   syncMarkdownView();
   bindEditorScroll(session.view, state.projectId, relativePath);
   updateSyncStatus();
-  applyEditorDiagnostics();
   setAwareness();
 }
 
@@ -3488,6 +3533,8 @@ async function compile() {
   const project = state.projectId;
   const selection = currentCompileSelection();
   let epoch = buildEpoch;
+  compiledSources.clear();
+  if (state.view && state.activeFile) compiledSources.set(state.activeFile, state.view.state.doc.toString());
   elements.compile_button.disabled = true;
   localizedText(elements.compile_button.querySelector("span"), () => t("Compiling"));
   elements.compile_button.setAttribute("aria-busy", "true");
@@ -3567,7 +3614,7 @@ function renderBuildErrors(log: string, mappedErrors?: ReturnType<typeof compile
   if (failed && !errors.some(error => error.severity === "error")) errors.unshift({ severity: "error", message: log.trim() || t("Compilation failed.") });
   const resolvedErrors = errors.map(error => ({ ...error, resolvedPath: error.line ? resolveDiagnosticPath(error.path) : undefined }));
   state.compileDiagnostics = resolvedErrors.map(({ resolvedPath, ...diagnostic }) => resolvedPath ? { ...diagnostic, path: resolvedPath } : diagnostic);
-  applyEditorDiagnostics();
+  applyEditorDiagnostics("compiler");
   const count = document.getElementById("log-error-count")!;
   const fatalCount = resolvedErrors.filter(error => error.severity === "error").length;
   localizedText(count, () => String(fatalCount));

@@ -627,6 +627,58 @@ test("inline diagnostics cover citations, references, and labels without a toolb
   });
 });
 
+test("diagnostic underlines follow edits instead of jumping back to stale positions", async () => {
+  await withEditor(async ({ page, base }) => {
+    const { defaultProjectId: id } = await (await page.request.get(`${base}/v1/projects`)).json();
+    await page.request.put(`${base}/v1/files?project=${id}&path=main.tex`, {
+      data: "Intro text here.\nSee \\ref{missing-label} for details.\nClosing line.\n",
+      headers: { "Content-Type": "text/plain" },
+    });
+    await page.route("**/v1/compile*", route => route.fulfill({ status: 422, contentType: "application/json", body: JSON.stringify({ error: { message: "Compilation failed" } }) }));
+    await page.route("**/v1/build?*", route => route.fulfill({ contentType: "application/json", body: JSON.stringify({ build: {
+      log: "! Undefined control sequence",
+      errors: [{ path: "/tmp/latexcoder-build/main.tex", line: 3, message: "Undefined control sequence" }],
+      stale: true,
+    } }) }));
+    await page.goto(`${base}/projects/${id}?e2e=1`);
+    await page.waitForFunction(() => document.querySelector("#sync-state")?.textContent === "Saved live");
+    await page.waitForFunction(() => document.querySelectorAll(".cm-diagnostic-range.warning").length === 1);
+    await page.locator("#compile-button").click();
+    await page.waitForFunction(() => document.querySelectorAll(".cm-diagnostic-range.error").length === 1);
+    const underlined = () => page.evaluate(() => [...document.querySelectorAll(".cm-diagnostic-range")].map(element => element.textContent));
+    assert.deepEqual(await underlined(), ["missing-label", "Closing line."]);
+
+    // Typing before the ranges: every sample, including the ones taken before
+    // the static checks rerun, keeps the underline on the same text.
+    await page.evaluate(() => { const { view } = globalThis.__paperE2E.state; view.focus(); view.dispatch({ selection: { anchor: 5 } }); });
+    for (const character of "abc") {
+      await page.keyboard.type(character);
+      assert.deepEqual(await underlined(), ["missing-label", "Closing line."]);
+    }
+    await page.keyboard.press("Enter");
+    assert.deepEqual(await underlined(), ["missing-label", "Closing line."]);
+    await page.waitForTimeout(500);
+    assert.deepEqual(await underlined(), ["missing-label", "Closing line."]);
+    assert.equal(await page.locator(".cm-lineNumbers .cm-diagnostic-line.error").textContent(), "4");
+
+    // Editing inside a compiler diagnostic clears it until the next build;
+    // the static check stays and is recomputed from the new text.
+    await page.evaluate(() => {
+      const { view } = globalThis.__paperE2E.state;
+      const line = view.state.doc.line(4);
+      view.dispatch({ selection: { anchor: line.to } });
+    });
+    await page.keyboard.press("Backspace");
+    assert.deepEqual(await underlined(), ["missing-label"]);
+    await page.evaluate(() => {
+      const { view } = globalThis.__paperE2E.state;
+      view.dispatch({ selection: { anchor: view.state.doc.toString().indexOf("missing-label") + "missing".length } });
+    });
+    await page.keyboard.type("X");
+    await page.waitForFunction(() => [...document.querySelectorAll(".cm-diagnostic-range")].map(element => element.textContent).join() === "missingX-label");
+  });
+});
+
 test("mouse drag creates an inline text selection", async () => {
   await withEditor(async ({ page }) => {
     await createEditor(page, LIPSUM);

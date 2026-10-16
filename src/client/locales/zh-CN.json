@@ -453,6 +453,7 @@
   "Tags": "标签",
   "The PDF changed. Try navigating again.": "PDF 已更新，请重新跳转。",
   "The Tree was refreshed because the source changed. Try the action again.": "源码已变更，文档结构已刷新，请重试。",
+  "The source changed since this PDF was compiled. The position may be approximate.": "源码在这份 PDF 编译后有改动，跳转位置可能不准确。",
   "The compile target changed. Try again.": "编译目标已变更，请重试。",
   "The folder containing the main document cannot be deleted": "无法删除包含主文档的文件夹",
   "The insertion point no longer exists": "插入位置已不存在",

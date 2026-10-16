@@ -453,6 +453,7 @@
   "Tags": "タグ",
   "The PDF changed. Try navigating again.": "PDF が変更されました。もう一度移動してください。",
   "The Tree was refreshed because the source changed. Try the action again.": "ソースが変わったため、文書構成を更新しました。もう一度操作してください。",
+  "The source changed since this PDF was compiled. The position may be approximate.": "この PDF の組版後に原稿が変更されたため、位置がずれている可能性があります。",
   "The compile target changed. Try again.": "組版対象が変更されました。もう一度お試しください。",
   "The folder containing the main document cannot be deleted": "主文書を含むフォルダーは削除できません",
   "The insertion point no longer exists": "挿入位置がなくなりました",

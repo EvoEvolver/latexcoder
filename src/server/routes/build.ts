@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { buildDiagnostics, compileErrors } from "../../shared/compile-errors.ts";
-import { projectedPosition } from "../../shared/source-map.ts";
+import { followLine, projectedPosition } from "../../shared/source-map.ts";
 import { syncTexPositions } from "../../shared/pdf-map.ts";
 import { compileRequestSchema, compileSelectionSchema } from "../../shared/api-schema.ts";
 import { apiError, MAX_TEXT_BYTES, safeRelativePath } from "../core.ts";
@@ -112,14 +112,18 @@ export function registerBuildRoutes(app: RouteApp, context: BuildRouteContext): 
       const runtime = await resolveBuild(request);
       const { page, x, y, revision } = request.body || {};
       if (!Number.isInteger(page) || page < 1 || page > 100000 || !Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x > 100000 || y > 100000) throw apiError("invalid_position", "Invalid PDF position");
-      if (runtime.compilePromise || revision !== runtime.build.sourceRevision) throw apiError("stale_pdf", "The PDF changed. Refresh the preview and try again.", 409);
+      // The artifacts of the last successful build stay in place while a new
+      // compile runs or after one fails, so an outdated PDF remains navigable.
+      // Only a PDF that no longer matches those artifacts cannot be mapped.
+      if (revision !== runtime.build.sourceRevision) throw apiError("stale_pdf", "The PDF changed. Refresh the preview and try again.", 409);
       if (!existsSync(path.join(runtime.buildDir, "latest.synctex.gz"))) throw apiError("synctex_missing", "Compile the project to enable PDF source navigation.", 409);
       const snapshot = JSON.parse(await readFile(path.join(runtime.buildDir, "source-map.json"), "utf8"));
+      if (snapshot.revision !== revision) throw apiError("stale_pdf", "The PDF changed. Refresh the preview and try again.", 409);
       let result;
       try {
         result = await run(options.synctex || "synctex", ["edit", "-o", `${page}:${x}:${y}:${path.join(runtime.buildDir, "latest.pdf")}`], { cwd: runtime.buildDir, timeoutMs: 5000, env: { ...process.env, SYNCTEX_EDITOR: "" } });
       } catch { throw apiError("synctex_unavailable", "SyncTeX is not installed on the server", 503); }
-      if (runtime.compilePromise || revision !== runtime.build.sourceRevision) throw apiError("stale_pdf", "The PDF changed. Refresh the preview and try again.", 409);
+      if (revision !== runtime.build.sourceRevision) throw apiError("stale_pdf", "The PDF changed. Refresh the preview and try again.", 409);
       const input = /^Input:(.*)$/m.exec(result.output)?.[1]?.trim();
       const line = Number(/^Line:(\d+)$/m.exec(result.output)?.[1]);
       if (!input || !line || result.code !== 0) throw apiError("source_not_found", "No source location at this PDF position", 404);
@@ -129,10 +133,15 @@ export function registerBuildRoutes(app: RouteApp, context: BuildRouteContext): 
       if (!map) throw apiError("source_not_found", "The source is outside this project", 404);
       file = map.path || file;
       runtime.collaboration.flush();
-      const current = await readFile(path.join(runtime.projectDir, safeRelativePath(file)), "utf8");
-      if (current !== map.source) throw apiError("stale_source", "This source changed since compilation. Compile again to navigate accurately.", 409);
+      const sourcePath = path.join(runtime.projectDir, safeRelativePath(file));
+      if (!existsSync(sourcePath)) throw apiError("source_not_found", "This source file no longer exists", 404);
+      const current = await readFile(sourcePath, "utf8");
+      const compiledLine = map.lines[line - 1] || line;
+      // Edited since compilation: follow the line into the current text and
+      // let the client say the position may be off.
+      const stale = current !== map.source;
       response.setHeader("Cache-Control", "no-store");
-      response.json({ path: file, line: map.lines[line - 1] || line });
+      response.json({ path: file, line: stale ? followLine(map.source, current, compiledLine) : compiledLine, stale });
     } catch (error) { next(error); }
   });
   app.post("/v1/compile", json({ limit: "16kb" }), async (request, response, next) => {

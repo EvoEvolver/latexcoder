@@ -295,7 +295,7 @@ test("real compiler Log errors navigate to an included source file", { skip: !re
 });
 
 for (const platform of ["MacIntel", "Linux x86_64"]) {
-test(`${platform} real SyncTeX PDF modifier-click opens included source and rejects stale source`, { skip: !realLatexmk }, async () => {
+test(`${platform} real SyncTeX PDF modifier-click opens included source and follows edited source`, { skip: !realLatexmk }, async () => {
   await withEditor(async ({ page, base }) => {
     await page.addInitScript(value => Object.defineProperty(navigator, "platform", { value }), platform);
     const modifier = platform === "MacIntel" ? "Meta" : "Control";
@@ -374,9 +374,18 @@ test(`${platform} real SyncTeX PDF modifier-click opens included source and reje
     assert.equal(invalid.status(), 400);
     const outdated = await page.request.post(`${base}/v1/build/source?project=${id}`, { data: { page: 1, x: 200, y: 130, revision: "old" } });
     assert.equal(outdated.status(), 409);
-    await page.request.put(`${base}/v1/files?project=${id}&path=chapters/intro.tex`, { data: child + "Changed", headers: { "Content-Type": "text/plain" } });
+    // An outdated PDF still navigates, landing on the edited line, with a hint.
+    await page.request.put(`${base}/v1/files?project=${id}&path=chapters/intro.tex`, { data: "% inserted above\n" + child, headers: { "Content-Type": "text/plain" } });
+    const staleResponse = page.waitForResponse(response => response.url().includes("/v1/build/source"));
     await clickSource();
-    await page.waitForFunction(() => document.querySelector("#toast")?.textContent?.includes("source changed"));
+    const stale = await staleResponse;
+    assert.equal(stale.status(), 200, await stale.text());
+    assert.equal((await stale.json()).stale, true);
+    await page.waitForFunction(() => document.querySelector("#toast")?.textContent?.includes("position may be approximate"));
+    await page.waitForFunction(() => {
+      const view = globalThis.__paperE2E.state.view;
+      return view.state.doc.lineAt(view.state.selection.main.head).text.includes("Unique source");
+    });
   }, { compiler: realLatexmk });
 });
 }

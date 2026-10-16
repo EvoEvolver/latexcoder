@@ -3460,6 +3460,7 @@ const pdfController = new PdfController({
       body: JSON.stringify({ page, x, y, revision }),
     });
     if (state.projectId !== projectId || epoch !== buildEpoch) throw new Error(t("The compile target changed. Try again."));
+    if (destination.stale) showToast(t("The source changed since this PDF was compiled. The position may be approximate."));
     return destination;
   },
   revealSource,

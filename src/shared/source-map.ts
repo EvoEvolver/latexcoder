@@ -1,3 +1,4 @@
+import { diffLines } from "diff";
 import { parseReviews } from "./review.ts";
 
 // SyncTeX sees the compile projection, not the review macros in the editor.
@@ -33,4 +34,27 @@ export function projectedPosition(source: string, originalOffset: number) {
   if (offset < 0) offset = projection.text.length;
   const prefix = projection.text.slice(0, offset);
   return { line: prefix.split("\n").length, column: offset - prefix.lastIndexOf("\n") };
+}
+
+// Carries a 1-based line from the source a PDF was compiled from into the
+// source as it reads now, so PDF navigation still lands near the right place
+// after edits. A line that was itself rewritten or deleted maps to where its
+// replacement begins.
+export function followLine(before: string, after: string, line: number): number {
+  if (before === after) return line;
+  let oldLine = 1;
+  let newLine = 1;
+  for (const part of diffLines(before, after)) {
+    const count = part.count ?? 0;
+    if (part.added) { newLine += count; continue; }
+    if (part.removed) {
+      if (line < oldLine + count) return Math.max(1, newLine);
+      oldLine += count;
+      continue;
+    }
+    if (line < oldLine + count) return newLine + (line - oldLine);
+    oldLine += count;
+    newLine += count;
+  }
+  return Math.max(1, Math.min(newLine, after.split("\n").length));
 }

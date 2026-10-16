@@ -196,7 +196,7 @@ const elementIds = [
   "auth-description", "auth-error", "auth-form", "auth-notice", "auth-page", "auth-password", "auth-submit", "auth-title", "auth-username",
   "active-file-label", "binary-download", "binary-fallback", "binary-fallback-download", "binary-kind", "binary-name", "binary-status", "binary-view",
   "browser-editing-description", "build-log", "build-output", "clone-command", "close-files", "close-output", "compile-button", "copy-agent-link", "copy-clone-command", "copy-share-link", "display-name", "download-project",
-  "collaborate-menu", "collaborator-close", "collaborator-dialog", "collaborator-done", "collaborator-list", "editor-page", "editor-pane", "editor-topbar", "editor", "empty-output", "file-list", "file-pdf-document", "file-preview-viewport", "file-preview-zoom-in", "file-preview-zoom-out", "files-menu", "files-pane", "guest-name-field", "image-preview", "markdown-preview", "markdown-preview-content", "markdown-rendered", "markdown-source", "markdown-view-switch", "new-project", "open-pdf", "output-pane", "pdf-document", "project-title", "review-actions", "topbar-actions", "topbar-status",
+  "collaborate-menu", "collaborator-close", "collaborator-dialog", "collaborator-done", "collaborator-list", "editor-empty", "editor-page", "editor-pane", "editor-topbar", "editor", "empty-output", "file-list", "file-pdf-document", "file-preview-viewport", "file-preview-zoom-in", "file-preview-zoom-out", "files-menu", "files-pane", "guest-name-field", "image-preview", "markdown-preview", "markdown-preview-content", "markdown-rendered", "markdown-source", "markdown-view-switch", "new-project", "open-pdf", "output-pane", "pdf-document", "project-title", "review-actions", "topbar-actions", "topbar-status",
   "copy-invite-link", "current-user", "invite-close", "invite-description", "invite-dialog", "invite-done", "invite-external", "invite-internal", "invite-link", "invite-regenerate", "invite-reusable", "invite-single", "invite-user", "logout-button",
   "copy-password-reset-link", "password-reset-link", "password-reset-link-close", "password-reset-link-dialog", "password-reset-link-done",
   "pdf-download", "pdf-fit-page", "pdf-fit-width", "pdf-status", "pdf-surface", "pdf-view", "pdf-zoom-in", "pdf-zoom-out", "presence", "review-count", "review-dialog", "review-form",
@@ -645,11 +645,22 @@ function renderSelectionActions() {
   menu.style.top = `${top}px`;
 }
 
-const fileTabs = createFileTabs(
-  document.getElementById("file-tabs")!,
-  path => { void openFile(path); },
-  id => { if (id === "structure") showExpandedStructure(); },
-);
+const fileTabs = createFileTabs(document.getElementById("file-tabs")!, {
+  open: path => { void openFile(path); },
+  openAuxiliary: id => { if (id === "structure") showExpandedStructure(); },
+  empty: showEmptyEditor,
+  copyPath: path => { void copyText(path, t("Copied {{v0}}", { v0: path })); },
+});
+
+// Closing the last tab leaves the editor without a file until one is chosen.
+function showEmptyEditor(): void {
+  disconnectEditor();
+  state.activeFile = "";
+  activeFileIsTransient = false;
+  hideExpandedStructure();
+  localizedText(elements.sync_state, () => t("No open files"));
+  renderFiles();
+}
 const fileTree = createFileTree(elements.file_list, {
   open: path => { void openFile(path); },
   search: () => openProjectSearch(),
@@ -1242,6 +1253,7 @@ function showExpandedStructure(): void {
   setMobileFilesOpen(false);
   elements.structure_view.hidden = false;
   elements.editor.hidden = true;
+  elements.editor_empty.hidden = true;
   elements.markdown_preview.hidden = true;
   elements.markdown_view_switch.hidden = true;
   elements.binary_view.hidden = true;
@@ -1254,6 +1266,7 @@ function hideExpandedStructure(): void {
   elements.structure_view.hidden = true;
   const file = state.files.find(candidate => candidate.path === state.activeFile);
   elements.editor.hidden = !file?.text;
+  elements.editor_empty.hidden = Boolean(file);
   elements.binary_view.hidden = file?.text !== false;
   elements.suggest_edit.hidden = !state.projectCanEdit || !file?.text;
   syncMarkdownView();
@@ -2416,6 +2429,7 @@ async function openFile(relativePath: string, options: { keepAuxiliary?: boolean
     fileTabs.activateFile();
     hideExpandedStructure();
   }
+  elements.editor_empty.hidden = true;
   setMobileFilesOpen(false);
   activeFileIsTransient = options.transient === true;
   if (relativePath === state.activeFile && (state.view || !file.text)) {

@@ -197,3 +197,64 @@ test("workspace panels resize, collapse from arrow handles, and switch the singl
     await page.waitForFunction(() => document.getElementById("files-pane")!.getBoundingClientRect().right <= 1);
   });
 });
+
+test("file tabs offer a context menu to close one, the others, those to the right, or all", async () => {
+  await withEditor(async ({ page, base }) => {
+    const { defaultProjectId: id } = await (await page.request.get(`${base}/v1/projects`)).json();
+    for (const name of ["alpha.tex", "beta.tex", "gamma.bib"]) {
+      await page.request.put(`${base}/v1/files?project=${id}&path=${name}`, { data: `% ${name}\n`, headers: { "Content-Type": "text/plain" } });
+    }
+    await page.goto(`${base}/projects/${id}?e2e=1`);
+    await page.waitForFunction(() => document.querySelector("#sync-state")?.textContent === "Saved live");
+    const tabs = () => page.locator("#file-tabs .file-tab");
+    const labels = () => tabs().locator(".file-tab-label").allTextContents();
+    for (const name of ["alpha.tex", "beta.tex", "gamma.bib"]) {
+      await page.locator("#file-list").getByText(name, { exact: true }).click();
+      await page.waitForFunction(active => globalThis.__paperE2E.state.activeFile === active && document.querySelector("#sync-state")?.textContent === "Saved live", name);
+    }
+    assert.deepEqual(await labels(), ["main.tex", "alpha.tex", "beta.tex", "gamma.bib"]);
+    assert.equal(await tabs().locator(".file-tab-icon.icon-braces").count(), 1);
+    assert.equal(await tabs().nth(3).getAttribute("class").then(value => value.includes("active")), true);
+
+    await tabs().nth(1).click({ button: "right" });
+    const menu = page.locator("#tab-context-menu");
+    await menu.waitFor();
+    assert.equal(await menu.locator("[data-tab-action=close-right]").isDisabled(), false);
+    await menu.locator("[data-tab-action=close-right]").click();
+    assert.deepEqual(await labels(), ["main.tex", "alpha.tex"]);
+    await page.waitForFunction(() => globalThis.__paperE2E.state.activeFile === "alpha.tex");
+    assert.equal(await menu.isHidden(), true);
+
+    await tabs().nth(0).click({ button: "right" });
+    await menu.locator("[data-tab-action=close-others]").click();
+    assert.deepEqual(await labels(), ["main.tex"]);
+    await page.waitForFunction(() => globalThis.__paperE2E.state.activeFile === "main.tex" && document.querySelector("#sync-state")?.textContent === "Saved live");
+
+    await tabs().nth(0).click({ button: "right" });
+    assert.equal(await menu.locator("[data-tab-action=close-others]").isDisabled(), true);
+    assert.equal(await menu.locator("[data-tab-action=close-right]").isDisabled(), true);
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => document.querySelector<HTMLElement>("#tab-context-menu")?.hidden);
+
+    // Middle click closes a tab too; the last one leaves the editor empty.
+    await page.locator("#file-list").getByText("beta.tex", { exact: true }).click();
+    await page.waitForFunction(() => globalThis.__paperE2E.state.activeFile === "beta.tex" && document.querySelector("#sync-state")?.textContent === "Saved live");
+    await tabs().nth(1).click({ button: "middle" });
+    assert.deepEqual(await labels(), ["main.tex"]);
+    await page.waitForFunction(() => globalThis.__paperE2E.state.activeFile === "main.tex");
+    await tabs().nth(0).click({ button: "right" });
+    await menu.locator("[data-tab-action=close-all]").click();
+    assert.equal(await tabs().count(), 0);
+    await page.locator("#editor-empty").waitFor({ state: "visible" });
+    assert.equal(await page.evaluate(() => globalThis.__paperE2E.state.activeFile), "");
+    assert.equal(await page.evaluate(() => globalThis.__paperE2E.state.view), null);
+
+    await page.locator("#file-list").getByText("gamma.bib", { exact: true }).click();
+    await page.waitForFunction(() => globalThis.__paperE2E.state.activeFile === "gamma.bib" && document.querySelector("#sync-state")?.textContent === "Saved live");
+    assert.equal(await page.locator("#editor-empty").isHidden(), true);
+    assert.deepEqual(await labels(), ["gamma.bib"]);
+    await page.reload();
+    await page.waitForFunction(() => document.querySelector("#sync-state")?.textContent === "Saved live");
+    assert.deepEqual(await labels(), ["gamma.bib"]);
+  });
+});

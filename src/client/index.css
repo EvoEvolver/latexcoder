@@ -172,14 +172,30 @@ html:not([data-user-type="internal"]) [data-internal-only] { display: none !impo
 .tree-writer-editor .cm-editor { min-height: 7rem; }
 @media (prefers-reduced-motion: reduce) { .tree-writer-chevron { transition: none; } }
 
-.file-tabs { display: flex; align-items: stretch; min-width: 0; overflow-x: auto; border-bottom: 1px solid var(--border); background: var(--muted); scrollbar-width: thin; }
-.file-tab { display: flex; flex-shrink: 0; align-items: center; gap: 5px; border-right: 1px solid var(--border); color: var(--muted-foreground); }
-.file-tab.active { background: var(--background); color: var(--foreground); box-shadow: inset 0 2px var(--primary); }
-.file-tab [role="tab"] { max-width: 230px; overflow: hidden; padding: 7px 4px 7px 12px; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.file-tab .close-tab { width: 22px; height: 24px; margin-right: 4px; border-radius: 3px; color: var(--muted-foreground); font-size: 13px; }
-.file-tab .close-tab:hover { background: var(--accent); }
-.file-tab.single-tab { gap: 0; }
-.file-tab.single-tab [role="tab"] { padding-right: 12px; }
+/* Open-file tabs: a flat strip whose active tab joins the editor below it.
+   The strip keeps the toolbar surface and draws its bottom line as an inset
+   shadow, so the active tab can cover that line and sit on the editor. */
+.file-tabs { display: flex; align-items: flex-end; gap: 2px; min-width: 0; padding: 0 8px; overflow-x: auto; overflow-y: hidden; border-bottom: 0 solid var(--border); background: var(--muted); box-shadow: inset 0 -1px var(--border); scrollbar-width: none; }
+.file-tabs::-webkit-scrollbar { display: none; }
+.file-tab { position: relative; display: flex; flex-shrink: 0; align-items: center; height: 36px; max-width: 240px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; color: var(--muted-foreground); transition: background-color .12s ease, color .12s ease; }
+.file-tab:hover { background: color-mix(in oklch, var(--background) 55%, transparent); color: var(--foreground); }
+.file-tab.active { background: var(--background); border-color: var(--border); color: var(--foreground); }
+.file-tab.active::before { content: ""; position: absolute; top: -1px; right: 10px; left: 10px; height: 2px; border-radius: 0 0 2px 2px; background: var(--primary); }
+.file-tab [role="tab"] { display: flex; min-width: 0; height: 100%; align-items: center; gap: 7px; padding: 0 4px 0 11px; border-radius: 7px 7px 0 0; font-size: 12px; font-weight: 500; }
+.file-tab.active [role="tab"] { font-weight: 600; }
+.file-tab [role="tab"]:focus-visible { outline: 2px solid var(--ring); outline-offset: -3px; }
+.file-tab-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-tab-icon { width: 14px; height: 14px; flex-shrink: 0; stroke-width: 1.8; color: var(--muted-foreground); opacity: .9; }
+.file-tab.active .icon-file-text, .file-tab.active .icon-braces { color: var(--primary); }
+.file-tab.active .icon-image { color: oklch(.52 .1 275); }
+html.dark .file-tab.active .icon-image { color: oklch(.75 .09 275); }
+.file-tab .close-tab { display: grid; width: 20px; height: 20px; margin: 0 6px 0 1px; place-items: center; border-radius: 4px; color: var(--muted-foreground); opacity: 0; transition: opacity .12s ease, background-color .12s ease; }
+.file-tab .close-tab svg { width: 13px; height: 13px; stroke-width: 2.2; }
+.file-tab:hover .close-tab, .file-tab.active .close-tab, .file-tab:focus-within .close-tab { opacity: 1; }
+.file-tab .close-tab:hover { background: var(--accent); color: var(--foreground); }
+.file-tab.auxiliary-tab { margin-left: 6px; }
+.file-tab.auxiliary-tab [role="tab"] { padding-left: 12px; font-style: italic; }
+@media (hover: none) { .file-tab .close-tab { opacity: 1; } }
 html.dark .icon-image { color: oklch(.75 .09 275); }
 html.dark .icon-folder, html.dark .icon-folder-open { color: oklch(.73 .055 235); }
 @media (prefers-reduced-motion: reduce) { .tree-chevron svg { transition: none; } }

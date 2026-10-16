@@ -24,6 +24,7 @@ RUN apt-get update \
     latexmk \
     ripgrep \
     texlive-binaries \
+    texlive-font-utils \
     texlive-fonts-recommended \
     texlive-lang-european \
     texlive-latex-base \

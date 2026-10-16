@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:22-bookworm-slim AS build
+FROM node:22-trixie-slim AS build
 
 WORKDIR /app
 RUN corepack enable
@@ -11,7 +11,7 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
 
-FROM node:22-bookworm-slim AS runtime
+FROM node:22-trixie-slim AS runtime
 
 # latexmk drives pdflatex, which needs the LaTeX format and packages from the
 # texlive-latex-* collections; texlive-binaries alone ships only the engines.

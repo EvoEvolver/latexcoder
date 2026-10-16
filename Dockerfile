@@ -13,14 +13,22 @@ RUN pnpm build
 
 FROM node:22-bookworm-slim AS runtime
 
+# latexmk drives pdflatex, which needs the LaTeX format and packages from the
+# texlive-latex-* collections; texlive-binaries alone ships only the engines.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     bubblewrap \
     ca-certificates \
     curl \
     git \
+    latexmk \
     ripgrep \
     texlive-binaries \
+    texlive-fonts-recommended \
+    texlive-latex-base \
+    texlive-latex-extra \
+    texlive-latex-recommended \
+    texlive-science \
     tini \
   && rm -rf /var/lib/apt/lists/*
 

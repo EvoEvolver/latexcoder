@@ -499,13 +499,23 @@ test("file tabs and typed file tree preserve files across switching, closing and
     if (await page.locator('[data-tree-path="notes"]').getAttribute("aria-expanded") !== "true") await page.locator('[data-tree-path="notes"]').click();
     await page.locator('[data-tree-path="notes/second.tex"]').click();
     await page.getByRole("tab", { name: "second.tex", exact: true }).waitFor();
+    assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("latexcoder-open-tabs") || "null").projects[globalThis.__paperE2E.state.projectId]), {
+      paths: ["main.tex", "notes/second.tex"], active: "notes/second.tex",
+    });
     await page.getByRole("tab", { name: "main.tex", exact: true }).click();
     await page.waitForFunction(() => globalThis.__paperE2E.state.activeFile === "main.tex");
     await page.getByRole("tab", { name: "second.tex", exact: true }).click();
     await page.waitForFunction(() => globalThis.__paperE2E.state.view?.state.doc.toString() === "Second document.");
+    await page.reload();
+    await page.waitForFunction(() => globalThis.__paperE2E.state.provider?.synced && globalThis.__paperE2E.state.activeFile === "notes/second.tex");
+    assert.equal(await page.getByRole("tab", { name: "main.tex", exact: true }).count(), 1, "open tabs survive refresh");
+    assert.equal(await page.getByRole("tab", { name: "second.tex", exact: true }).count(), 1, "active tab survives refresh");
     await page.getByRole("button", { name: "Close notes/second.tex", exact: true }).click();
     await page.waitForFunction(() => globalThis.__paperE2E.state.activeFile === "main.tex");
     assert.equal(await page.getByRole("tab", { name: "second.tex", exact: true }).count(), 0);
+    await page.reload();
+    await page.waitForFunction(() => globalThis.__paperE2E.state.provider?.synced && globalThis.__paperE2E.state.activeFile === "main.tex");
+    assert.equal(await page.getByRole("tab", { name: "second.tex", exact: true }).count(), 0, "closed tabs stay closed after refresh");
     assert.equal((await page.request.get(`${base}/v1/files?path=notes/second.tex`)).status(), 200);
     assert.equal(await page.locator('[data-path="picture.png"] .icon-image').count(), 1);
     if (await page.locator('[data-tree-path="notes"]').getAttribute("aria-expanded") !== "true") await page.locator('[data-tree-path="notes"]').click();

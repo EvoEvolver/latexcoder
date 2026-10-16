@@ -685,7 +685,7 @@ test("comment accepts arbitrary selected LaTeX fragments", async () => {
     }, [from, to]);
     await page.locator("#selection-comment").click();
     await page.locator("#review-text").fill("Comment on this fragment");
-    await page.locator("#dialog-submit").click();
+    await page.locator("#review-text").press("Enter");
 
     const { doc } = await editorState(page);
     assert.match(doc, /\\cmtbg\{[^}]+\}\{[^}]+\}\{fragment % note\\cmted\{Comment on this fragment\}/);
@@ -693,6 +693,12 @@ test("comment accepts arbitrary selected LaTeX fragments", async () => {
     await highlight.waitFor();
     await highlight.hover();
     const tooltip = page.locator(".cm-review-tooltip.comment");
+    await tooltip.waitFor();
+    await tooltip.getByRole("button", { name: "Edit", exact: true }).click();
+    await page.locator("#review-text").fill("Updated comment");
+    await page.locator("#review-text").press("Enter");
+    await page.waitForFunction(() => globalThis.__paperTest.state.view.state.doc.toString().includes("Updated comment"));
+    await highlight.hover();
     await tooltip.waitFor();
     assert.equal(await tooltip.getByRole("button", { name: "Open thread" }).count(), 1);
     await tooltip.getByRole("button", { name: "Reply", exact: true }).click();

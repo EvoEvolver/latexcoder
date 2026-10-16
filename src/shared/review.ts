@@ -4,7 +4,7 @@ export type ReviewKind = "comment" | "revision" | "addition" | "deletion";
 export type ReviewItem = {
   kind: ReviewKind; id: string; author: string; body: string; note: string;
   replies: ReviewReply[]; repliesValid: boolean; messages: ReviewMessage[];
-  from: number; bodyFrom: number; bodyTo: number; replyInsertAt: number | null; to: number;
+  from: number; bodyFrom: number; bodyTo: number; noteFrom: number | null; noteTo: number | null; replyInsertAt: number | null; to: number;
 };
 
 function parseBraced(source: string, start: number): { value: string; end: number } | null {
@@ -91,6 +91,8 @@ function parseReviewKind(source: string, kind: ReviewKind, opening: string, clos
       from,
       bodyFrom: author.end,
       bodyTo: closeAt,
+      noteFrom: note ? closeAt + closing.length + 1 : null,
+      noteTo: note ? closeAt + closing.length + 1 + (comment?.note.length ?? note.value.length) : null,
       replyInsertAt: note ? note.end - 1 : null,
       to,
     });

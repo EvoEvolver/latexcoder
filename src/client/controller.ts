@@ -1,7 +1,7 @@
 import { formatDate, localizedDocumentTitle, localizedAttribute, localizedText, t } from './i18n.ts';
 import { createVersionHistory } from "./version-history";
 import { compileDirectives, type CompileMode, type CompileSelection } from "../shared/compile-directives.ts";
-import { createFileTabs } from "./file-tabs.ts";
+import { createFileTabs, loadTabState } from "./file-tabs.ts";
 import { createFileTree } from "./file-tree.ts";
 import { renderMarkdownPreview as renderMarkdownDocument } from "./markdown-preview.ts";
 import { autocompletion, closeBrackets } from "@codemirror/autocomplete";
@@ -1339,6 +1339,7 @@ const reviewTooltip = hoverTooltip((view, position) => {
         if (item.kind === "comment") actions.append(tooltipButton("Open thread", () => openCommentThread(item.id)));
       } else if (item.kind === "comment") {
         actions.append(
+          tooltipButton("Edit", () => openCommentEditor(item)),
           tooltipButton("Reply", () => openCommentThread(item.id, true)),
           tooltipButton("Open thread", () => openCommentThread(item.id)),
           tooltipButton("Resolve", () => applyReviewDecision(item.id, "resolve")),
@@ -2506,6 +2507,11 @@ function openReplyComposer(article: HTMLElement, threadId: string): void {
     form.remove();
     if (appendCommentReply(threadId, input.value)) showToast(t("Reply added."));
   });
+  input.addEventListener("keydown", event => {
+    if (event.key !== "Enter" || event.shiftKey) return;
+    event.preventDefault();
+    form.requestSubmit();
+  });
   article.querySelector(".review-buttons").before(form);
   input.focus();
 }
@@ -2513,6 +2519,7 @@ function openReplyComposer(article: HTMLElement, threadId: string): void {
 let projectReviewFiles: Array<{ path: string; reviews: ReturnType<typeof parseReviews> }> = [];
 let reviewProjectId = "";
 let reviewRequestVersion = 0;
+let editingComment: { id: string; path: string } | null = null;
 
 function renderReviews() {
   if (reviewProjectId !== state.projectId) {
@@ -2633,6 +2640,12 @@ function drawReviews() {
     if (!state.projectCanEdit) {
       actions.hidden = true;
     } else if (group.kind === "comment") {
+      const edit = reviewButton("Edit", async () => {
+        if (!await selectReviewFile(group.path)) return;
+        const current = parseReviews(state.view?.state.doc.toString() || "")
+          .find(candidate => candidate.kind === "comment" && candidate.id === group.id);
+        if (current) openCommentEditor(current);
+      });
       const reply = reviewButton("Reply", async () => {
         if (!await selectReviewFile(group.path)) return;
         drawReviews();
@@ -2640,7 +2653,7 @@ function drawReviews() {
         if (current) openReplyComposer(current, group.id);
       });
       reply.dataset.commentReply = "";
-      actions.append(reply, reviewButton("Resolve", () => decide("resolve")));
+      actions.append(edit, reply, reviewButton("Resolve", () => decide("resolve")));
     } else {
       actions.append(
         reviewButton("Accept", () => decide("accept")),
@@ -2669,6 +2682,18 @@ function cleanMetadata(value: string): string {
   return value.replaceAll("\\", "/").replace(/[{}%#]/g, " ").replace(/\s+/g, " ").trim();
 }
 
+function openCommentEditor(item: ReturnType<typeof parseReviews>[number]): void {
+  if (item.kind !== "comment" || !state.view || item.noteFrom === null || item.noteTo === null) return;
+  editingComment = { id: item.id, path: state.activeFile };
+  state.reviewSelection = null;
+  localizedText(document.getElementById("dialog-title"), () => t("Edit comment"));
+  localizedText(document.getElementById("dialog-label"), () => t("Comment"));
+  elements.review_text.value = item.note;
+  elements.review_dialog.showModal();
+  elements.review_text.focus();
+  elements.review_text.select();
+}
+
 function openReviewDialog() {
   if (!state.projectCanEdit) return showToast(t("This link has View access."));
   if (!state.view) return showToast(t("Open a text file first."));
@@ -2679,6 +2704,7 @@ function openReviewDialog() {
     return showToast(t("Resolve the existing review before adding another one."));
   }
   state.reviewSelection = { from: selection.from, to: selection.to, selected };
+  editingComment = null;
   localizedText(document.getElementById("dialog-title"), () => t("Inline comment"));
   localizedText(document.getElementById("dialog-label"), () => t("Comment"));
   elements.review_text.value = "";
@@ -2687,19 +2713,34 @@ function openReviewDialog() {
   elements.review_text.select();
 }
 
+elements.review_text.addEventListener("keydown", event => {
+  if (event.key !== "Enter" || event.shiftKey) return;
+  event.preventDefault();
+  (elements.review_form as HTMLFormElement).requestSubmit();
+});
+
 elements.review_form.addEventListener("submit", (event: Event) => {
   event.preventDefault();
   if (!state.projectCanEdit) return;
-  const review = state.reviewSelection;
   const value = elements.review_text.value;
-  if (!review || !value.trim()) return;
-  const id = randomId();
-  const author = cleanMetadata(displayName());
-  const inserted = `\\cmtbg{${id}}{${author}}${review.selected}\\cmted{${cleanMetadata(value)}}`;
-  state.view.dispatch({
-    changes: { from: review.from, to: review.to, insert: inserted },
-    annotations: reviewMutation.of(true),
-  });
+  if (!value.trim()) return;
+  if (editingComment) {
+    const item = parseReviews(state.view.state.doc.toString())
+      .find(candidate => candidate.kind === "comment" && candidate.id === editingComment?.id);
+    if (!item || item.noteFrom === null || item.noteTo === null || editingComment.path !== state.activeFile) return;
+    state.view.dispatch({ changes: { from: item.noteFrom, to: item.noteTo, insert: cleanMetadata(value) }, annotations: reviewMutation.of(true) });
+    editingComment = null;
+  } else {
+    const review = state.reviewSelection;
+    if (!review) return;
+    const id = randomId();
+    const author = cleanMetadata(displayName());
+    const inserted = `\\cmtbg{${id}}{${author}}${review.selected}\\cmted{${cleanMetadata(value)}}`;
+    state.view.dispatch({
+      changes: { from: review.from, to: review.to, insert: inserted },
+      annotations: reviewMutation.of(true),
+    });
+  }
   elements.review_dialog.close();
   state.view.focus();
   renderReviews();
@@ -2737,7 +2778,9 @@ async function refreshProject(open = false, recordOpen = false) {
     if (data.project.build.pdf) showPdf();
   }
   if (open) {
+    const restored = loadTabState(state.projectId)?.active;
     const target = state.files.find(file => file.path === state.activeFile)?.path
+      || state.files.find(file => file.path === restored)?.path
       || state.files.find(file => file.path === data.project.main)?.path
       || state.files.find(file => file.text)?.path
       || state.files[0]?.path;

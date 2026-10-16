@@ -15,7 +15,9 @@ RUN pnpm build
 # documents do not fail on whichever package or font a distribution split
 # left out. Documentation and sources are skipped to keep the image smaller.
 # It lives in its own stage so changes to the runtime layers never invalidate
-# this multi-gigabyte layer. Override TEXLIVE_REPOSITORY to pin a mirror.
+# this multi-gigabyte layer. A fixed mirror replaces the mirror.ctan.org
+# redirector, which can land on a mirror with a broken TLS chain; override
+# TEXLIVE_REPOSITORY to use another one.
 FROM node:22-trixie-slim AS texlive
 
 RUN apt-get update \
@@ -23,9 +25,9 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 # The architecture-specific bin directory gets a stable name for PATH.
-ARG TEXLIVE_REPOSITORY=https://mirror.ctan.org/systems/texlive/tlnet
+ARG TEXLIVE_REPOSITORY=https://mirrors.mit.edu/CTAN/systems/texlive/tlnet
 RUN mkdir /tmp/install-tl \
-  && curl -fsSL "${TEXLIVE_REPOSITORY}/install-tl-unx.tar.gz" | tar -xz --strip-components=1 -C /tmp/install-tl \
+  && curl -fsSL --retry 5 --retry-all-errors "${TEXLIVE_REPOSITORY}/install-tl-unx.tar.gz" | tar -xz --strip-components=1 -C /tmp/install-tl \
   && printf '%s\n' \
     'selected_scheme scheme-full' \
     'TEXDIR /usr/local/texlive' \

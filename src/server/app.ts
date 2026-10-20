@@ -13,6 +13,7 @@ import { StateDatabase } from "./database.ts";
 import { parseReviews } from "../shared/review.ts";
 import { apiError, isTextFile, MAX_FILE_BYTES, MAX_TEXT_BYTES, parseCookies, passwordRecord, pathFromRoomName, randomToken, safeRelativePath, sessionCookie, sha256, validatePassword } from "./core.ts";
 import { listFiles, listFolders } from "./project-files.ts";
+import { detectMainDocument, findMainDocument } from "./main-document.ts";
 import { run, runBinary } from "./process.ts";
 import { createCollaborationStore } from "./collaboration.ts";
 import { latestVersionWithMetadata, versionFolders, versionInfo, versionMessage } from "./version-history.ts";
@@ -357,19 +358,6 @@ async function withTemporaryWorktree<T>(runtime: ProjectRuntime, commit: string,
   }
 }
 
-// The pushed repository decides its own entry point: keep the configured main
-// document when it exists, otherwise prefer main.tex and fall back to the first
-// .tex file in the tree. A repository without any .tex file keeps the default
-// and the project opens without a main document until one is chosen.
-async function incomingMainDocument(runtime: ProjectRuntime, commit: string): Promise<string> {
-  const output = (await git(runtime.projectDir, ["ls-tree", "-r", "--name-only", "-z", commit])).output;
-  const files = output ? output.split("\0").filter(Boolean) : [];
-  if (files.includes(runtime.build.main)) return runtime.build.main;
-  return files.find(file => file === "main.tex")
-    || files.filter(file => file.endsWith(".tex")).sort((left, right) => left.split("/").length - right.split("/").length || left.localeCompare(right))[0]
-    || runtime.build.main;
-}
-
 async function gitSyncLocked(runtime: ProjectRuntime, requestedRef: string, blameActor?: BlameActor) {
     await ensureGitRepository(runtime.projectDir);
     const checkpoint = await gitCheckpoint(runtime, "Checkpoint before sync");
@@ -392,7 +380,7 @@ async function gitSyncLocked(runtime: ProjectRuntime, requestedRef: string, blam
     // with. The checkpoint above clears the marker once the project is no
     // longer empty, so later pushes take the ordinary merge path.
     const adopting = Boolean(runtime.metadata.git?.awaitingPush);
-    const adoptedMain = adopting ? await incomingMainDocument(runtime, incoming) : runtime.build.main;
+    let adoptedMain = runtime.build.main;
 
     if (!adopting) {
       const incomingIsAncestor = await git(runtime.projectDir, ["merge-base", "--is-ancestor", incoming, local], { allowedCodes: [0, 1] });
@@ -415,6 +403,9 @@ async function gitSyncLocked(runtime: ProjectRuntime, requestedRef: string, blam
         mergedCommit = await gitHead(worktree);
       }
       try {
+        // Only the first push selects an entry point. Later syncs preserve the
+        // user's setting, including manually selected chapter documents.
+        if (adopting) adoptedMain = await detectMainDocument(worktree) || runtime.build.main;
         await importGitWorktree(runtime, worktree, adoptedMain, true, mergedCommit, blameActor, !adopting);
       } catch (error) {
         semanticConflict = error instanceof Error ? error : new Error(String(error));
@@ -1176,9 +1167,10 @@ export async function createPaperServer(options: ServerOptions = {}): Promise<Pa
       database.createProject(metadata);
       const runtime = await loadProject(id);
       if (importedFiles.length) {
-        const main = importedFiles.find(file => file.relativePath === "main.tex")
-          || importedFiles.find(file => file.relativePath.endsWith(".tex"));
-        if (main) { runtime.build.main = main.relativePath; database.saveBuild(id, runtime.build); }
+        const main = findMainDocument(importedFiles.filter(file => file.relativePath.endsWith(".tex")).map(file => ({
+          path: file.relativePath, source: Buffer.from(file.content).toString("utf8"),
+        })));
+        if (main) { runtime.build.main = main; database.saveBuild(id, runtime.build); }
       }
       return runtime;
     } catch (error) {

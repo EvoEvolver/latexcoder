@@ -371,7 +371,13 @@ export function AppShell() {
       <dialog id="settings-dialog" className={dialogClass}>
         <form id="settings-form" className="space-y-4 p-5">
           <Localized title="Project settings"><DialogHeader title="Project settings" closeId="settings-close" /></Localized>
-          <label className="grid gap-1.5 text-sm" htmlFor="settings-main"><Message id="Main document" /><select id="settings-main" className="h-9 min-w-0 rounded-md border bg-background px-3" /></label>
+          <div className="grid gap-1.5 text-sm">
+            <label htmlFor="settings-main"><Message id="Main document" /></label>
+            <div className="flex gap-2">
+              <select id="settings-main" className="h-9 min-w-0 flex-1 rounded-md border bg-background px-3" />
+              <Button id="settings-detect-main" type="button" variant="outline" size="sm"><Message id="Auto-detect" /></Button>
+            </div>
+          </div>
           <label className="grid gap-1.5 text-sm" htmlFor="settings-compiler"><Message id="Compiler" /><select id="settings-compiler" className="h-9 rounded-md border bg-background px-3"><Localized text="Automatic"><option value="auto">Automatic</option></Localized><option value="tectonic">Tectonic</option><option value="latexmk">latexmk</option></select></label>
           <div className="flex flex-wrap gap-2 border-t pt-4">
             <Button id="open-trash" type="button" variant="outline" size="sm"><Icon name="trash-2" /><Message id="Recently deleted" /></Button>

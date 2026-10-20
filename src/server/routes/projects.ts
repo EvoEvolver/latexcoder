@@ -6,6 +6,7 @@ import { parseReviews } from "../../shared/review.ts";
 import { createProjectRequestSchema, projectArchiveRequestSchema, projectTagsRequestSchema, settingsRequestSchema, updateProjectRequestSchema } from "../../shared/api-schema.ts";
 import { apiError, contentPath, readProjectZip } from "../core.ts";
 import { listFiles, listFolders } from "../project-files.ts";
+import { detectMainDocument } from "../main-document.ts";
 import type { ZodType } from "zod";
 import type { ProjectRouteContext, RouteApp } from "./types.ts";
 
@@ -104,6 +105,14 @@ export function registerProjectRoutes(app: RouteApp, context: ProjectRouteContex
   app.get("/v1/settings", async (request, response, next) => {
     try { response.json({ settings: database.getSettings((await context.resolveProject(request)).id) }); }
     catch (error) { next(error); }
+  });
+  app.get("/v1/project/main-document", async (request, response, next) => {
+    try {
+      const runtime = await context.resolveProject(request);
+      const main = await detectMainDocument(runtime.projectDir, file => runtime.collaboration.readText(file));
+      response.setHeader("Cache-Control", "no-store");
+      response.json({ main: main || null });
+    } catch (error) { next(error); }
   });
   app.patch("/v1/settings", json({ limit: "16kb" }), async (request, response, next) => {
     try {

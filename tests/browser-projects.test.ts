@@ -109,6 +109,41 @@ test("settings and project replace preview apply through the real UI", async () 
   });
 });
 
+test("settings auto-detects the main document and only changes it after Save", async () => {
+  await withEditor(async ({ page, base }) => {
+    const { defaultProjectId: id } = await (await page.request.get(base + "/v1/projects")).json();
+    await page.request.put(base + "/v1/files?project=" + id + "&path=main.tex", {
+      data: "\\input{defs}", headers: { "Content-Type": "text/plain" },
+    });
+    await page.request.put(base + "/v1/files?project=" + id + "&path=lec.tex", {
+      data: "\\documentclass{article}\n\\begin{document}Lecture\\end{document}", headers: { "Content-Type": "text/plain" },
+    });
+    await page.goto(base + "/projects/" + id + "?e2e=1");
+    await page.waitForFunction(() => document.querySelector("#sync-state")?.textContent === "Saved live");
+    const savedMain = async () => (await (await page.request.get(base + "/v1/settings?project=" + id)).json()).settings.main;
+    await chooseAppMenu(page, "project", "#project-settings");
+    await page.locator("#settings-dialog[open]").waitFor();
+    assert.equal(await page.locator("#settings-main").inputValue(), "main.tex");
+    await page.locator("#settings-detect-main").click();
+    await page.waitForFunction(() => (document.querySelector("#settings-main") as HTMLSelectElement).value === "lec.tex");
+    assert.equal(await savedMain(), "main.tex");
+    await page.locator("#settings-close").click();
+    await chooseAppMenu(page, "project", "#project-settings");
+    await page.locator("#settings-dialog[open]").waitFor();
+    assert.equal(await page.locator("#settings-main").inputValue(), "main.tex");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator("#settings-detect-main").click();
+    await page.waitForFunction(() => (document.querySelector("#settings-main") as HTMLSelectElement).value === "lec.tex");
+    await page.screenshot({ path: "/tmp/latexcoder-main-document-mobile.png" });
+    await page.locator("#settings-form button[type=submit]").click();
+    await page.locator("#settings-dialog").waitFor({ state: "hidden" });
+    assert.equal(await savedMain(), "lec.tex");
+    await page.reload();
+    await page.waitForFunction(() => document.querySelector("#sync-state")?.textContent === "Saved live");
+    assert.equal(await savedMain(), "lec.tex");
+  });
+});
+
 test("folder menus rename, delete and restore complete directories", async () => {
   await withEditor(async ({ page, base }) => {
     const { defaultProjectId: id } = await (await page.request.get(`${base}/v1/projects`)).json();

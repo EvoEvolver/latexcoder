@@ -363,6 +363,7 @@ test("Git conflicts quarantine incoming commits while Yjs stays on main", async 
 });
 
 test("an empty project adopts the history of an existing repository pushed into it", async () => {
+  const document = (body: string) => "\\documentclass{article}\n\\begin{document}\n" + body + "\n\\end{document}\n";
   await withServer(async ({ base }) => {
     const created = await fetch(`${base}/v1/projects`, {
       method: "POST",
@@ -382,10 +383,12 @@ test("an empty project adopts the history of an existing repository pushed into 
       const origin = path.join(temporary, "origin");
       await mkdir(origin, { recursive: true });
       await testGit(origin, ["init", "-b", "main"]);
-      await writeFile(path.join(origin, "paper.tex"), "already written elsewhere\n", "utf8");
+      await writeFile(path.join(origin, "main.tex"), "\\input{defs}\n", "utf8");
+      await writeFile(path.join(origin, "qcircuit.tex"), "\\ProvidesPackage{qcircuit}\n", "utf8");
+      await writeFile(path.join(origin, "paper.tex"), document("already written elsewhere"), "utf8");
       await testGit(origin, ["add", "-A"]);
       await testGit(origin, ["commit", "-m", "First commit of the existing repository"]);
-      await writeFile(path.join(origin, "paper.tex"), "already written elsewhere, revised\n", "utf8");
+      await writeFile(path.join(origin, "paper.tex"), document("already written elsewhere, revised"), "utf8");
       await testGit(origin, ["commit", "-am", "Second commit of the existing repository"]);
       const history = await testGit(origin, ["log", "--format=%s"]);
 
@@ -395,7 +398,7 @@ test("an empty project adopts the history of an existing repository pushed into 
 
       assert.equal(
         await (await fetch(`${base}/v1/files?project=${projectId}&path=paper.tex`)).text(),
-        "already written elsewhere, revised\n",
+        document("already written elsewhere, revised"),
       );
       const gitState = await (await fetch(`${base}/v1/git?project=${projectId}`)).json();
       assert.equal(gitState.git.dirty, false);
@@ -406,14 +409,20 @@ test("an empty project adopts the history of an existing repository pushed into 
         .find((project: { id: string }) => project.id === projectId);
       assert.equal(reloaded.git?.awaitingPush, undefined);
 
-      // The project now behaves like any other: the next push fast-forwards.
-      await writeFile(path.join(origin, "paper.tex"), "pushed again\n", "utf8");
+      // Later pushes preserve a manually selected main, even a fragment.
+      const settings = await fetch(base + "/v1/settings?project=" + projectId, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ main: "qcircuit.tex", compiler: "auto" }),
+      });
+      assert.equal(settings.status, 200);
+      await writeFile(path.join(origin, "paper.tex"), document("pushed again"), "utf8");
       await testGit(origin, ["commit", "-am", "Third commit"]);
       await testGit(origin, ["push", "latexcoder", "main"]);
       assert.equal(
         await (await fetch(`${base}/v1/files?project=${projectId}&path=paper.tex`)).text(),
-        "pushed again\n",
+        document("pushed again"),
       );
+      assert.equal((await (await fetch(base + "/v1/settings?project=" + projectId)).json()).settings.main, "qcircuit.tex");
     } finally {
       await rm(temporary, { recursive: true, force: true });
     }

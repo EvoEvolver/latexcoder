@@ -247,6 +247,8 @@
   "Loading version…": "正在加载版本…",
   "Locating source; updating PDF if needed...": "正在定位源码，必要时更新 PDF…",
   "Log": "日志",
+  "Auto-detect": "自动识别",
+  "No LaTeX document found.": "未找到 LaTeX 文档。",
   "Main document": "主文档",
   "Main document: {{v0}} → {{v1}}": "主文档：{{v0}} → {{v1}}",
   "Manage SSH keys": "管理 SSH 密钥",

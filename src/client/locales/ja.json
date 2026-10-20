@@ -247,6 +247,8 @@
   "Loading version…": "版を読み込み中…",
   "Locating source; updating PDF if needed...": "ソースの位置を検索中。必要に応じて PDF を更新します…",
   "Log": "実行記録",
+  "Auto-detect": "自動検出",
+  "No LaTeX document found.": "LaTeX 文書が見つかりません。",
   "Main document": "主文書",
   "Main document: {{v0}} → {{v1}}": "主文書：{{v0}} → {{v1}}",
   "Manage SSH keys": "SSH 鍵を管理",

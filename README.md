@@ -204,6 +204,8 @@ deletion.
 
 Projects can be created from ZIP archives, and uploading a ZIP inside an
 existing project adds files without overwriting existing ones.
+ZIP imports and first Git pushes detect the main document from LaTeX source
+and file references. Existing projects can use **Auto-detect** in project settings.
 
 ## Git
 

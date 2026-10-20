@@ -4613,6 +4613,20 @@ onDynamicClick("project-settings", async () => {
   } catch (error) { showToast(error.message); }
 });
 document.getElementById("settings-close")!.addEventListener("click", () => settingsDialog.close());
+const detectMainButton = document.getElementById("settings-detect-main") as HTMLButtonElement;
+detectMainButton.addEventListener("click", async () => {
+  const projectId = state.projectId;
+  detectMainButton.disabled = true;
+  try {
+    const { main } = await request<{ main: string | null }>("v1/project/main-document");
+    if (state.projectId !== projectId || !settingsDialog.open) return;
+    if (!main) { showToast(t("No LaTeX document found.")); return; }
+    const select = document.getElementById("settings-main") as HTMLSelectElement;
+    if (![...select.options].some(option => option.value === main)) select.add(new Option(main, main));
+    select.value = main;
+  } catch (error) { showToast(error.message); }
+  finally { detectMainButton.disabled = false; }
+});
 document.getElementById("settings-form")!.addEventListener("submit", async event => {
   event.preventDefault();
   try {

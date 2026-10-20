@@ -6,6 +6,7 @@ import path from "node:path";
 import { createPatch } from "diff";
 import type { ZodType } from "zod";
 import { blameChangesRequestSchema, type BlameChangeInfo } from "../../shared/api-schema.ts";
+import { parseReviews } from "../../shared/review.ts";
 
 import { apiError, contentPath, isTextFile, MAX_FILE_BYTES, MAX_TEXT_BYTES, readProjectZip, safeRelativePath, sha256 } from "../core.ts";
 import { checkedContentTarget, contentEntries } from "../project-files.ts";
@@ -127,20 +128,25 @@ export function registerFileRoutes(app: RouteApp, context: FileRouteContext): vo
       const agent = typeof request.query.agentId === "string" && typeof request.query.agentName === "string"
         ? { id: request.query.agentId.slice(0, 100), name: request.query.agentName.slice(0, 100) }
         : proposal ? { id: "ag_proposal", name: "Coding agent" } : undefined;
-      const { result, version } = await context.withGitReader(runtime, () => context.withGitOperation(runtime, async () => {
+      const { result, version, removedReviews } = await context.withGitReader(runtime, () => context.withGitOperation(runtime, async () => {
         const baseSha256 = request.get("X-Base-SHA256");
         if (!baseSha256 || !/^[a-f0-9]{64}$/.test(baseSha256)) throw apiError("invalid_base_sha256", "X-Base-SHA256 must be a lowercase SHA-256 hex digest");
         const currentSha256 = sha256(runtime.collaboration.readText(relativePath));
         if (currentSha256 !== baseSha256) throw apiError("stale_file", "file changed since it was downloaded; download the latest file and retry", 409, { path: relativePath, expectedSha256: baseSha256, currentSha256 });
         await context.gitCheckpoint(runtime, "Before agent edit");
+        const reviewsBefore = parseReviews(runtime.collaboration.readText(relativePath));
         const result = runtime.collaboration.editFile(relativePath, baseSha256, source, { mode, agent });
         runtime.collaboration.flush();
         const version = await context.gitCheckpoint(runtime, `Agent edit: ${relativePath}`, { kind: "agent", main: runtime.build.main, agentId: agent?.id, agentName: agent?.name || "Coding agent", mode });
-        return { result, version: result.changeCount ? version.commit : null };
+        // A full-file upload can drop review storage silently; report which
+        // threads and suggestions are gone so the agent can tell if it meant to.
+        const remaining = new Set(parseReviews(result.source).map(item => item.id));
+        const removedReviews = reviewsBefore.filter(item => !remaining.has(item.id)).map(({ id, kind }) => ({ id, kind }));
+        return { result, version: result.changeCount ? version.commit : null, removedReviews };
       }));
       response.setHeader("ETag", `"${result.sha256}"`);
       response.setHeader("X-Content-SHA256", result.sha256);
-      response.json({ file: { path: relativePath, size: Buffer.byteLength(result.source), text: true, sha256: result.sha256 }, edit: { version, mode: result.mode, changeCount: result.changeCount, suggestionIds: result.suggestionIds } });
+      response.json({ file: { path: relativePath, size: Buffer.byteLength(result.source), text: true, sha256: result.sha256 }, edit: { version, mode: result.mode, changeCount: result.changeCount, suggestionIds: result.suggestionIds, removedReviews } });
     } catch (error) {
       if (error && typeof error === "object" && "code" in error && error.code === "stale_file") {
         const failure = error as { details?: Record<string, unknown> };

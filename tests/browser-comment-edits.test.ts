@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { withEditor, createEditor, editorState, setCursor } from "./helpers/browser.ts";
+import { parseArchivedComments, stripReviewStorage } from "../src/shared/review.ts";
 
 const opening = "\\cmtbg{thread}{Ada}";
 const closing = "\\cmted{Check this \\cmtrpl{reply}{Bob}{Agreed}}";
@@ -30,7 +31,7 @@ test("normal keyboard edits cross comment boundaries and undo restores the compl
   });
 });
 
-test("replacement keeps the comment but deleting its entire body removes the thread", async () => {
+test("replacement keeps the comment and deleting its entire body detaches the thread", async () => {
   await withEditor(async ({ page }) => {
     await createEditor(page, source);
     await page.evaluate(() => { globalThis.__paperTest.state.suggesting = false; });
@@ -47,7 +48,9 @@ test("replacement keeps the comment but deleting its entire body removes the thr
       view.dispatch({ selection: { anchor, head } }); view.focus();
     }, [bodyFrom, bodyFrom + "new text!".length]);
     await page.keyboard.press("Delete");
-    assert.equal((await editorState(page)).doc, "Before  after");
+    const result = (await editorState(page)).doc;
+    assert.equal(stripReviewStorage(result), "Before  after");
+    assert.equal(parseArchivedComments(result)[0].replies[0].body, "Agreed");
     assert.equal(await page.locator(".cm-review-comment").count(), 0);
   });
 });
@@ -64,7 +67,7 @@ test("Backspace and Delete beside hidden markers edit neighbouring visible text"
     assert.equal((await editorState(page)).doc, `Before${opening}brave world${closing}after`);
     await page.keyboard.press("ControlOrMeta+a");
     await page.keyboard.press("Backspace");
-    assert.equal((await editorState(page)).doc, "");
+    assert.equal(stripReviewStorage((await editorState(page)).doc), "");
     await page.keyboard.press("ControlOrMeta+z");
     assert.equal((await editorState(page)).doc, source);
   });

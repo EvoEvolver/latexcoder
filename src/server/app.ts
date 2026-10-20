@@ -10,7 +10,7 @@ import { WebSocketServer } from "ws";
 
 import { createGitSshServer, sshPublicEndpoint, type SshGitRunner } from "./git-ssh.ts";
 import { StateDatabase } from "./database.ts";
-import { parseReviews } from "../shared/review.ts";
+import { parseReviews, reviewFormat } from "../shared/review.ts";
 import { apiError, isTextFile, MAX_FILE_BYTES, MAX_TEXT_BYTES, parseCookies, passwordRecord, pathFromRoomName, randomToken, safeRelativePath, sessionCookie, sha256, validatePassword } from "./core.ts";
 import { listFiles, listFolders } from "./project-files.ts";
 import { detectMainDocument, findMainDocument } from "./main-document.ts";
@@ -645,6 +645,14 @@ To create suggestions, add \`&mode=suggesting&agentId=ag_unique&agentName=writer
 
 Text files are synchronized through Yjs. Writing through the API updates connected editors. Inline comments use \`\\cmtbg{id}{name}text\\cmted{comment}\`; replies are appended inside the final argument as \`\\cmtrpl{reply-id}{name}{reply}\`. Suggestion mode tracks insertions as \`\\addbg{id}{name}text\\added{}\` and deletions as \`\\delbg{id}{name}text\\deled{}\`. Keep the empty groups after \`\\added\` and \`\\deled\`; they prevent TeX from joining a following word to the macro name.
 
+Markdown reviews use hidden HTML comments instead of LaTeX macros. Their payloads
+are percent-encoded JSON: cmtbg carries {id,author}, cmted carries the note string,
+and reply carries {id,author,body}. For example, the opening marker starts with
+<!--latexcoder:cmtbg: and ends with -->. The same names addbg/added, delbg/deled,
+and revbg/reved represent suggestions. Existing LaTeX review macros in Markdown
+are migrated automatically, preserving notes and replies.
+GET /v1/reviews?resolved=1 includes archived resolved and detached discussions.
+
 ## Trust
 
 Passwords are scrypt-hashed and share URLs are bearer secrets exchanged for
@@ -763,7 +771,7 @@ version saved before your edit.
 
 ${proposal ? "" : `## Reply To An Inline Comment
 
-Comments are stored as:
+In LaTeX files, comments are stored as:
 
 \\cmtbg{thread-id}{Author}selected text\\cmted{initial comment}
 
@@ -774,6 +782,25 @@ closing brace of that comment's \\cmted argument:
 
 Keep the existing comment and replies intact unless the user explicitly asks
 to resolve or rewrite them. Upload the updated file with its original base hash.
+
+Markdown files use hidden HTML comments with percent-encoded JSON payloads.
+An opening <!--latexcoder:cmtbg:PAYLOAD--> stores {id,author}; its matching
+<!--latexcoder:cmted:PAYLOAD--> stores the note as a JSON string.
+Append <!--latexcoder:reply:PAYLOAD--> after the closing marker and any existing
+replies, with {id,author,body} as the payload. Encode payloads with
+encodeURIComponent(JSON.stringify(value)); encode hyphens as %2D as well.
+Preserve these markers and their existing replies when editing the body.
+
+Resolved and detached discussions remain in the source as percent-encoded JSON
+thread records. Read them before raising a point that may already be settled:
+GET ${origin}/v1/reviews?${capability}&resolved=1
+Each file's archived array includes status, id, author, body (the original
+quote), note, replies, changedAt and changedBy. Preserve those records during
+uploads. To resolve a comment, keep its body and append a record with status
+"resolved", the current ISO timestamp and your name: use a separate
+% latexcoder:thread:PAYLOAD line in LaTeX (with newlines on both sides), or
+<!--latexcoder:thread:PAYLOAD--> in Markdown. Removing a thread's markers alone
+discards its discussion instead of archiving it.
 `}
 
 ${proposal ? "" : `## Create A File
@@ -1129,6 +1156,9 @@ export async function createPaperServer(options: ServerOptions = {}): Promise<Pa
       onError: error => { if (!runtime.deleting) logger.error("git.checkpoint.failed", error, { projectId }); },
     });
     autoCheckpoints.set(projectId, autoCheckpoint);
+    for (const file of await listFiles(projectDir)) {
+      if (reviewFormat(file.path) === "markdown") runtime.collaboration.readText(file.path);
+    }
     autoCheckpoint.changed();
     return runtime;
   }

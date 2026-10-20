@@ -1,9 +1,11 @@
 export type ReviewReply = { id: string; author: string; body: string };
 export type ReviewMessage = ReviewReply & { root: boolean };
 export type ReviewKind = "comment" | "revision" | "addition" | "deletion";
+export type ReviewFormat = "tex" | "markdown";
 export type ReviewItem = {
   kind: ReviewKind; id: string; author: string; body: string; note: string;
   replies: ReviewReply[]; repliesValid: boolean; messages: ReviewMessage[];
+  format?: "markdown";
   from: number; bodyFrom: number; bodyTo: number; noteFrom: number | null; noteTo: number | null; replyInsertAt: number | null; to: number;
 };
 
@@ -107,16 +109,134 @@ export function parseReviews(source: string): ReviewItem[] {
     ...parseReviewKind(source, "revision", "\\revbg", "\\reved", true),
     ...parseReviewKind(source, "addition", "\\addbg", "\\added", false),
     ...parseReviewKind(source, "deletion", "\\delbg", "\\deled", false),
+    ...parseMarkdownReviews(source),
   ]
     .sort((left, right) => left.from - right.from);
 }
 
+const reviewNames = {
+  comment: ["cmtbg", "cmted"], revision: ["revbg", "reved"],
+  addition: ["addbg", "added"], deletion: ["delbg", "deled"],
+} as const;
+export function reviewFormat(file: string): ReviewFormat { return /\.(md|markdown)$/i.test(file) ? "markdown" : "tex"; }
+export function encodeReviewValue(value: unknown): string { return encodeURIComponent(JSON.stringify(value)).replaceAll("-", "%2D"); }
+function markdownMarker(name: string, value: unknown): string {
+  return "<!--latexcoder:" + name + ":" + encodeReviewValue(value) + "-->";
+}
+export function reviewReply(reply: ReviewReply, format: ReviewFormat): string {
+  return format === "markdown" ? markdownMarker("reply", reply) : "\\cmtrpl{" + reply.id + "}{" + reply.author + "}{" + reply.body + "}";
+}
+export function reviewMarkers(kind: ReviewKind, id: string, author: string, format: ReviewFormat, note = "", replies: ReviewReply[] = []) {
+  const [opening, closing] = reviewNames[kind];
+  if (format === "markdown") return {
+    opening: markdownMarker(opening, { id, author }),
+    closing: markdownMarker(closing, note) + replies.map(reply => reviewReply(reply, format)).join(""),
+  };
+  return {
+    opening: "\\" + opening + "{" + id + "}{" + author + "}",
+    closing: "\\" + closing + (kind === "comment" || kind === "revision"
+      ? "{" + note + replies.map(reply => reviewReply(reply, format)).join("") + "}" : "{}"),
+  };
+}
+
+function parseMarkdownReviews(source: string): ReviewItem[] {
+  const result: ReviewItem[] = [];
+  const starts = /<!--latexcoder:(cmtbg|revbg|addbg|delbg):([^\r\n]*?)-->/g;
+  for (let match; (match = starts.exec(source));) {
+    try {
+      const metadata: unknown = JSON.parse(decodeURIComponent(match[2]));
+      if (!metadata || typeof metadata !== "object" || !("id" in metadata) || !("author" in metadata)
+        || typeof metadata.id !== "string" || typeof metadata.author !== "string") continue;
+      const kind = (Object.keys(reviewNames) as ReviewKind[]).find(kind => reviewNames[kind][0] === match[1])!;
+      const closing = "<!--latexcoder:" + reviewNames[kind][1] + ":";
+      const closeAt = source.indexOf(closing, starts.lastIndex);
+      const end = closeAt < 0 ? -1 : source.indexOf("-->", closeAt + closing.length);
+      if (end < 0) continue;
+      const note: unknown = JSON.parse(decodeURIComponent(source.slice(closeAt + closing.length, end)));
+      if (typeof note !== "string") continue;
+      let to = end + 3, valid = true;
+      const replies: ReviewReply[] = [];
+      while (kind === "comment" && source.startsWith("<!--latexcoder:reply:", to)) {
+        const replyEnd = source.indexOf("-->", to + 20);
+        if (replyEnd < 0) { valid = false; break; }
+        const value: unknown = JSON.parse(decodeURIComponent(source.slice(to + "<!--latexcoder:reply:".length, replyEnd)));
+        if (!value || typeof value !== "object" || !("id" in value) || !("author" in value) || !("body" in value)
+          || typeof value.id !== "string" || typeof value.author !== "string" || typeof value.body !== "string"
+          || !value.id || replies.some(reply => reply.id === value.id)) { valid = false; break; }
+        replies.push({ id: value.id, author: value.author, body: value.body });
+        to = replyEnd + 3;
+      }
+      result.push({
+        kind, id: metadata.id, author: metadata.author, body: source.slice(starts.lastIndex, closeAt), note,
+        replies, repliesValid: valid, messages: kind === "comment" ? [
+          { id: metadata.id, author: metadata.author, body: note, root: true },
+          ...replies.map(reply => ({ ...reply, root: false })),
+        ] : [], format: "markdown", from: match.index, bodyFrom: starts.lastIndex, bodyTo: closeAt,
+        noteFrom: closeAt + closing.length, noteTo: end, replyInsertAt: to, to,
+      });
+      starts.lastIndex = to;
+    } catch { /* Keep malformed storage visible so it can be repaired. */ }
+  }
+  return result;
+}
+
+export function normalizeMarkdownReviews(source: string, file: string): string {
+  if (reviewFormat(file) !== "markdown") return source;
+  let result = source;
+  for (const item of parseReviews(source).reverse()) {
+    if (item.format === "markdown" || !item.repliesValid) continue;
+    const markers = reviewMarkers(item.kind, item.id, item.author, "markdown", item.note, item.replies);
+    result = result.slice(0, item.from) + markers.opening + item.body + markers.closing + result.slice(item.to);
+  }
+  for (const item of parseArchivedComments(result).reverse()) {
+    if (result.startsWith("<!--", item.from)) continue;
+    const { from, to, ...record } = item;
+    result = result.slice(0, from) + markdownMarker("thread", record) + result.slice(to);
+  }
+  return result;
+}
+
+export type ArchivedComment = {
+  id: string; author: string; body: string; note: string; replies: ReviewReply[];
+  status: "resolved" | "detached"; changedAt: string; changedBy: string;
+  from: number; to: number;
+};
+
+export function archiveComment(item: Pick<ReviewItem, "id" | "author" | "body" | "note" | "replies">, status: ArchivedComment["status"], changedBy: string, format: ReviewFormat): string {
+  const payload = encodeReviewValue({
+    id: item.id, author: item.author, body: item.body, note: item.note, replies: item.replies,
+    status, changedAt: new Date().toISOString(), changedBy,
+  });
+  return format === "markdown" ? "<!--latexcoder:thread:" + payload + "-->" : "\n% latexcoder:thread:" + payload + "\n";
+}
+
+export function parseArchivedComments(source: string): ArchivedComment[] {
+  const records: ArchivedComment[] = [];
+  const markers = /\r?\n% latexcoder:thread:([^\r\n]*)(?:\r?\n)?|<!--latexcoder:thread:([^\r\n]*?)-->/g;
+  for (const match of source.matchAll(markers)) {
+    try {
+      const value = JSON.parse(decodeURIComponent(match[1] ?? match[2]));
+      if (!value || !["id", "author", "body", "note", "changedAt", "changedBy"].every(key => typeof value[key] === "string")
+        || !["resolved", "detached"].includes(value.status) || !Array.isArray(value.replies)
+        || !value.replies.every((reply: Record<string, unknown>) => reply && typeof reply === "object" && ["id", "author", "body"].every(key => typeof reply[key] === "string"))) continue;
+      records.push({
+        id: value.id, author: value.author, body: value.body, note: value.note, replies: value.replies,
+        status: value.status, changedAt: value.changedAt, changedBy: value.changedBy,
+        from: match.index, to: match.index + match[0].length,
+      });
+    } catch { /* Leave malformed records visible and recoverable. */ }
+  }
+  return records;
+}
+
 export function stripReviewStorage(source: string): string {
-  const reviews = parseReviews(source);
+  const reviews = [
+    ...parseReviews(source).map(item => ({ ...item, replacement: item.kind === "deletion" ? "" : item.body })),
+    ...parseArchivedComments(source).map(item => ({ ...item, replacement: "" })),
+  ].sort((left, right) => left.from - right.from);
   let visible = source;
   for (const item of reviews.reverse()) {
-    const body = item.kind === "deletion" ? "" : item.body;
-    visible = `${visible.slice(0, item.from)}${body}${visible.slice(item.to)}`;
+    visible = `${visible.slice(0, item.from)}${item.replacement}${visible.slice(item.to)}`;
   }
   return visible;
 }

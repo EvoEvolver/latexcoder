@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import path from "node:path";
 
-import { parseReviews } from "../../shared/review.ts";
+import { parseArchivedComments, parseReviews } from "../../shared/review.ts";
 import { createProjectRequestSchema, projectArchiveRequestSchema, projectTagsRequestSchema, settingsRequestSchema, updateProjectRequestSchema } from "../../shared/api-schema.ts";
 import { apiError, contentPath, readProjectZip } from "../core.ts";
 import { listFiles, listFolders } from "../project-files.ts";
@@ -135,7 +135,10 @@ export function registerProjectRoutes(app: RouteApp, context: ProjectRouteContex
       const runtime = await context.resolveProject(request);
       const files = await listFiles(runtime.projectDir);
       response.setHeader("Cache-Control", "no-store");
-      response.json({ files: files.filter(file => file.text).map(file => ({ path: file.path, reviews: parseReviews(runtime.collaboration.readText(file.path)) })) });
+      response.json({ files: files.filter(file => file.text).map(file => {
+        const source = runtime.collaboration.readText(file.path);
+        return { path: file.path, reviews: parseReviews(source), ...(request.query.resolved === "1" ? { archived: parseArchivedComments(source) } : {}) };
+      }) });
     } catch (error) { next(error); }
   });
   app.post("/v1/project/share", async (request, response, next) => {

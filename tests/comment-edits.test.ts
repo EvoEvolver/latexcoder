@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { mapCommentEdit } from "../src/client/comment-edits.ts";
-import { parseReviews, stripReviewStorage } from "../src/shared/review.ts";
+import { parseArchivedComments, parseReviews, stripReviewStorage } from "../src/shared/review.ts";
 
 const opening = "\\cmtbg{thread}{Ada}";
 const closing = "\\cmted{Clarify this \\cmtrpl{reply}{Bob}{Agreed}}";
@@ -32,11 +32,17 @@ test("comment edits map across either boundary without losing thread metadata", 
   assert.equal(right.selection.main.head, thread.bodyTo);
 });
 
-test("deleting all annotated text removes its comment and replacing it preserves the thread", () => {
-  assert.equal(edit(bodyFrom, bodyTo).text, "Before  after");
-  assert.equal(edit(0, source.length).text, "");
+test("deleting annotated text detaches the comment and paragraph replacements re-anchor it", () => {
+  const deleted = edit(bodyFrom, bodyTo).text;
+  assert.equal(stripReviewStorage(deleted), "Before  after");
+  assert.equal(parseArchivedComments(deleted)[0].body, "brave world");
+  assert.equal(parseArchivedComments(deleted)[0].replies[0].body, "Agreed");
+  assert.equal(stripReviewStorage(edit(0, source.length).text), "");
   assert.equal(edit(bodyFrom, bodyTo, "replacement").text, `Before ${opening}replacement${closing} after`);
-  assert.equal(edit(0, source.length, "replacement").text, "replacement");
+  const replacement = edit(0, source.length, "replacement").text;
+  assert.equal(stripReviewStorage(replacement), "replacement");
+  assert.equal(parseReviews(replacement)[0].id, "thread");
+  assert.equal(parseReviews(replacement)[0].replies[0].body, "Agreed");
 });
 
 test("typing or pasting at a hidden marker maps to the visible text boundary", () => {
@@ -60,7 +66,23 @@ test("multiple edits and reversed selections keep mapped caret positions", () =>
 test("one deletion can span several comments while preserving the remaining thread", () => {
   const text = `${opening}one${closing} gap \\cmtbg{second}{Bob}two\\cmted{Note} tail`;
   const result = edit(0, text.indexOf("two") + 1, "", text).text;
-  assert.equal(result, "\\cmtbg{second}{Bob}wo\\cmted{Note} tail");
+  assert.equal(stripReviewStorage(result), "wo tail");
+  assert.equal(parseReviews(result)[0].id, "second");
+  assert.equal(parseArchivedComments(result)[0].id, "thread");
+});
+
+test("future edits preserve detached history, including typing at hidden storage", () => {
+  let text = edit(0, source.length).text;
+  assert.equal(parseArchivedComments(text)[0].replies[0].body, "Agreed");
+  text = edit(text.length, text.length, "Next paragraph.", text).text;
+  assert.equal(stripReviewStorage(text), "Next paragraph.");
+  const archive = parseArchivedComments(text)[0];
+  text = edit(archive.from + 5, archive.from + 5, "New ", text).text;
+  assert.equal(stripReviewStorage(text), "New Next paragraph.");
+  assert.equal(parseArchivedComments(text)[0].replies[0].body, "Agreed");
+  text = edit(0, text.length, "Replacement.", text).text;
+  assert.equal(stripReviewStorage(text), "Replacement.");
+  assert.equal(parseArchivedComments(text)[0].id, "thread");
 });
 
 test("Backspace and Delete at hidden storage delete a visible Unicode grapheme", () => {
@@ -81,7 +103,10 @@ test("Backspace and Delete at hidden storage delete a visible Unicode grapheme",
 test("deleting a last annotated grapheme cleans up storage and leaves no dangling markers", () => {
   const text = `${opening}👩‍💻${closing}`;
   const item = parseReviews(text)[0];
-  assert.equal(edit(item.bodyFrom, item.bodyTo, "", text).text, "");
+  const result = edit(item.bodyFrom, item.bodyTo, "", text).text;
+  assert.equal(stripReviewStorage(result), "");
+  assert.equal(parseReviews(result).length, 0);
+  assert.equal(parseArchivedComments(result)[0].body, "👩‍💻");
 });
 
 test("arbitrary replacements match the visible source projection across multiple threads", () => {
@@ -99,6 +124,7 @@ test("arbitrary replacements match the visible source projection across multiple
       assert.equal(stripReviewStorage(result), visible.slice(0, visibleOffset(from)) + insert + visible.slice(visibleOffset(to)),
         `edit ${from}:${to} inserting ${JSON.stringify(insert)}`);
       for (const item of parseReviews(result)) assert.ok(comments.some(original => original.id === item.id && original.note === item.note));
+      assert.deepEqual(new Set([...parseReviews(result), ...parseArchivedComments(result)].map(item => item.id)), new Set(comments.map(item => item.id)), "every thread survives as an active or detached comment");
       const head = edited.selection.main.head;
       const hiddenBeforeHead = parseReviews(result).flatMap(item => [
         { from: item.from, to: item.bodyFrom }, { from: item.bodyTo, to: item.to },

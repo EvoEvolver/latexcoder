@@ -10,6 +10,7 @@ import type { AddressInfo } from "node:net";
 import { chromium } from "playwright";
 import { zipSync, strToU8 } from "fflate";
 import { createPaperServer } from "../src/server/main.ts";
+import { parseArchivedComments, stripReviewStorage } from "../src/shared/review.ts";
 
 import { withEditor, LIPSUM, chooseAppMenu, toggleBlame, openRootFileMenu, selectionContextMenu, realLatexmk, previewPdf, createEditor, setCursor, editorState, dragSelect } from "./helpers/browser.ts";
 
@@ -276,6 +277,8 @@ test("graphics references open project previews and URL references open a safe n
     await page.context().route("https://example.test/**", route => route.fulfill({ contentType: "text/html", body: "Linked page" }));
     for (const needle of ["figs/tool_usage.pdf", "figs/tool_usage}", "https://example.test/"]) {
       await page.goto(`${base}/projects/${id}?e2e=1`);
+      await page.locator('[data-tree-path="main.tex"]').click();
+      await page.waitForFunction(() => globalThis.__paperE2E?.state.activeFile === "main.tex" && globalThis.__paperE2E.state.provider?.synced);
       await page.waitForFunction(() => document.querySelector("#sync-state")?.textContent === "Saved live");
       const point = await page.evaluate(needle => {
         const { view } = globalThis.__paperE2E.state;
@@ -762,7 +765,9 @@ test("comment accepts arbitrary selected LaTeX fragments", async () => {
     assert.equal(await page.locator(".review-item.comment .comment-message").count(), 2);
     assert.match((await editorState(page)).doc, /\\cmtrpl\{[^}]+\}\{[^}]+\}\{I added a source\}/);
     await page.locator(".review-item button", { hasText: "Resolve" }).click();
-    assert.equal((await editorState(page)).doc, content);
+    const resolved = (await editorState(page)).doc;
+    assert.equal(stripReviewStorage(resolved), content);
+    assert.equal(parseArchivedComments(resolved)[0].replies[0].body, "I added a source");
   });
 });
 
@@ -852,6 +857,8 @@ test(`${platform} modifier-click follows includes, citations, and label referenc
     }
     for (const macro of ["include", "cite", "citep", "citet", "ref", "autoref", "cref", "eqref"]) {
       await page.goto(`${base}/projects/${id}?e2e=1`);
+      await page.locator('[data-tree-path="main.tex"]').click();
+      await page.waitForFunction(() => globalThis.__paperE2E?.state.activeFile === "main.tex" && globalThis.__paperE2E.state.provider?.synced);
       await page.waitForFunction(() => globalThis.__paperE2E?.state.view?.state.doc.toString().includes("\\include"));
       const point = await page.evaluate(command => {
         const view = globalThis.__paperE2E.state.view;

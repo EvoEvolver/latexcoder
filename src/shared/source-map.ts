@@ -1,5 +1,5 @@
 import { diffLines } from "diff";
-import { parseReviews } from "./review.ts";
+import { parseArchivedComments, parseReviews } from "./review.ts";
 
 // SyncTeX sees the compile projection, not the review macros in the editor.
 export function compileSourceMap(source: string) {
@@ -10,9 +10,9 @@ export function compileSourceMap(source: string) {
     for (let offset = from; offset < to; offset++) offsets.push(offset);
   };
   let cursor = 0;
-  for (const item of parseReviews(source)) {
+  for (const item of [...parseReviews(source), ...parseArchivedComments(source)].sort((left, right) => left.from - right.from)) {
     append(cursor, item.from);
-    if (item.kind !== "deletion") append(item.bodyFrom, item.bodyTo);
+    if ("kind" in item && item.kind !== "deletion") append(item.bodyFrom, item.bodyTo);
     cursor = item.to;
   }
   append(cursor, source.length);

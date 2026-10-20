@@ -42,8 +42,10 @@ can clone, push to, and back up like any other directory.
 - Edit simultaneously with live cursors and presence.
 - Share a project with a view or edit link. Guests don't need an account.
 - Comment, reply, and suggest changes inline. Reviews live in the source as
-  LaTeX macros, so agents and Git can read them too — nothing is locked in a
-  UI-only database.
+  LaTeX macros or hidden HTML comments in Markdown, so agents and Git can read
+  them too. Paragraph replacements retain their threads; removed anchors stay
+  in **Detached comments**. **Resolve** preserves the discussion under **Resolved**,
+  with **Reopen** available when its original text can be uniquely located.
 
 ### Navigate the paper, not just its files
 

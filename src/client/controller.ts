@@ -90,7 +90,8 @@ import { diffLines } from "diff";
 import { AUTO_COMPILE_EVENT, autoCompileEnabled } from "./auto-compile.ts";
 import * as Y from "yjs";
 
-import { parseReviews, stripReviewStorage, type ReviewItem } from "../shared/review.ts";
+import { archiveComment, encodeReviewValue, parseArchivedComments, parseReviews, reviewFormat, reviewMarkers, reviewReply, stripReviewStorage, type ArchivedComment, type ReviewItem } from "../shared/review.ts";
+import { reopenCommentChanges } from "../shared/comment-history.ts";
 import { mapCommentEdit } from "./comment-edits.ts";
 import { referenceDefinition, type ReferenceLink } from "../shared/references.ts";
 import { normalizeProjectPath, resolveGraphicsPath } from "../shared/assets.ts";
@@ -1307,6 +1308,7 @@ class RevisionDeletionWidget extends WidgetType {
 
 function buildReviewDecorations(editorState: EditorState) {
   const ranges = [];
+  for (const item of parseArchivedComments(editorState.doc.toString())) ranges.push(Decoration.replace({}).range(item.from, item.to));
   for (const item of parseReviews(editorState.doc.toString())) {
     ranges.push(Decoration.replace({}).range(item.from, item.bodyFrom));
     if (item.bodyFrom < item.bodyTo) {
@@ -1424,10 +1426,20 @@ function trackedSuggestion(transaction: Transaction, reviews: ReviewItem[]): Tra
     queueMicrotask(() => showToast(t("Turn off Suggesting to edit the document class.")));
     return [];
   }
-  if (/\\(?:cmtbg|cmted|cmtrpl|revbg|reved|addbg|added|delbg|deled)\b/.test(change.inserted)) {
+  if (/\\(?:cmtbg|cmted|cmtrpl|revbg|reved|addbg|added|delbg|deled)\b|<!--latexcoder:/.test(change.inserted)) {
     queueMicrotask(() => showToast(t("Review storage macros are managed by LaTeX Coder.")));
     return [];
   }
+  const archived = parseArchivedComments(source);
+  for (const item of archived) {
+    if (change.from === change.to && change.from > item.from && change.from < item.to) {
+      change.from = change.to = item.from;
+    } else if (change.from < item.to && change.to > item.from) {
+      change.from = Math.min(change.from, item.from);
+      change.to = Math.max(change.to, item.to);
+    }
+  }
+  const retainedArchives = archived.filter(item => change.from <= item.from && change.to >= item.to);
 
   const ownAddition = reviews.find(item => (
     item.kind === "addition"
@@ -1461,7 +1473,10 @@ function trackedSuggestion(transaction: Transaction, reviews: ReviewItem[]): Tra
     }
   }
 
-  const deleted = transaction.startState.sliceDoc(change.from, change.to);
+  let deleted = transaction.startState.sliceDoc(change.from, change.to);
+  for (const item of [...retainedArchives].reverse()) {
+    deleted = deleted.slice(0, item.from - change.from) + deleted.slice(item.to - change.from);
+  }
   const userEvent = transaction.annotation(Transaction.userEvent);
   // yCollab echoes the merge transaction back as a plain input.type sync, so
   // also treat a deletion at the recorded block boundary as a Backspace.
@@ -1470,7 +1485,7 @@ function trackedSuggestion(transaction: Transaction, reviews: ReviewItem[]): Tra
     && (userEvent === "delete.backward" || (last && change.from + deleted.length === last.from));
   // Consecutive Backspace keystrokes extend the deletion block the caret is
   // sitting at instead of nesting a new marker pair per character.
-  const previousDeletion = backwardDelete && last && reviews.find(item => (
+  const previousDeletion = !retainedArchives.length && backwardDelete && last && reviews.find(item => (
     item.kind === "deletion" && item.author === author && item.id === last.id && item.from === last.from
   ));
   if (previousDeletion && previousDeletion.from === change.from + deleted.length) {
@@ -1483,7 +1498,10 @@ function trackedSuggestion(transaction: Transaction, reviews: ReviewItem[]): Tra
     const changes = {
       from: change.from,
       to: previousDeletion.to,
-      insert: `\\delbg{${previousDeletion.id}}{${previousDeletion.author}}${body}\\deled{}`,
+      insert: (() => {
+        const markers = reviewMarkers("deletion", previousDeletion.id, previousDeletion.author, reviewFormat(state.activeFile));
+        return markers.opening + body + markers.closing;
+      })(),
     };
     last.from = change.from;
     lastDeletion.set(state.view, last);
@@ -1502,9 +1520,12 @@ function trackedSuggestion(transaction: Transaction, reviews: ReviewItem[]): Tra
     return [];
   }
   const id = randomId();
-  const deletion = deleted ? `\\delbg{${id}}{${author}}${deleted}\\deled{}` : "";
-  const additionStart = change.inserted ? `\\addbg{${id}}{${author}}` : "";
-  const addition = change.inserted ? `${additionStart}${change.inserted}\\added{}` : "";
+  const format = reviewFormat(state.activeFile);
+  const deletionMarkers = reviewMarkers("deletion", id, author, format);
+  const additionMarkers = reviewMarkers("addition", id, author, format);
+  const deletion = deleted ? deletionMarkers.opening + deleted + deletionMarkers.closing : "";
+  const additionStart = change.inserted ? additionMarkers.opening : "";
+  const addition = change.inserted ? additionStart + change.inserted + additionMarkers.closing : "";
   const replacement = `${deletion}${addition}`;
   // Backspace wraps text behind the caret: the caret stays where the user
   // pressed it, in front of the new deletion block, ready to continue
@@ -1516,7 +1537,7 @@ function trackedSuggestion(transaction: Transaction, reviews: ReviewItem[]): Tra
     : change.from + deletion.length + (addition ? additionStart.length + change.inserted.length : 0);
   if (backwardDelete) lastDeletion.set(state.view, { id, from: change.from });
   return {
-    changes: { from: change.from, to: change.to, insert: replacement },
+    changes: { from: change.from, to: change.to, insert: replacement + retainedArchives.map(item => source.slice(item.from, item.to)).join("") },
     selection: { anchor: cursor },
     annotations: reviewMutation.of(true),
     // The tracked macro pair replaces the raw edit, so treat every suggestion
@@ -1535,10 +1556,10 @@ const protectReviewStorage = EditorState.transactionFilter.of(transaction => {
 
   const reviews = parseReviews(transaction.startState.doc.toString());
   if (state.suggesting) return trackedSuggestion(transaction, reviews);
-  const mapped = mapCommentEdit(transaction, reviews);
+  const mapped = mapCommentEdit(transaction, reviews, { format: reviewFormat(state.activeFile), author: displayName() });
   let blocked = false;
   transaction.changes.iterChanges((_from, _to, _newFrom, _newTo, inserted) => {
-    if (/\\(?:cmtbg|cmted|cmtrpl|revbg|reved|addbg|added|delbg|deled)\b/.test(inserted.toString())) blocked = true;
+    if (/\\(?:cmtbg|cmted|cmtrpl|revbg|reved|addbg|added|delbg|deled)\b|<!--latexcoder:/.test(inserted.toString())) blocked = true;
   });
   (mapped?.changes ?? transaction.changes).iterChanges((from, to) => {
     for (const item of reviews) {
@@ -2570,6 +2591,8 @@ function applyReviewDecisions(ids: string[], decision: ReviewDecision): void {
     if (item.kind === "deletion") insert = decision === "reject" ? item.body : "";
     return { from: item.from, to: item.to, insert };
   }).sort((left, right) => left.from - right.from);
+  const archives = items.filter(item => item.kind === "comment").map(item => archiveComment(item, "resolved", displayName(), reviewFormat(state.activeFile))).join("");
+  if (archives) changes.push({ from: state.view.state.doc.length, to: state.view.state.doc.length, insert: archives });
   state.view.dispatch({ changes, annotations: reviewMutation.of(true) });
   renderReviews();
   renderSelectionActions();
@@ -2587,7 +2610,7 @@ function appendCommentReply(threadId: string, value: string): boolean {
     showToast(t("This comment thread cannot accept a reply."));
     return false;
   }
-  const reply = `\\cmtrpl{${randomId()}}{${cleanMetadata(displayName())}}{${cleanMetadata(value)}}`;
+  const reply = reviewReply({ id: randomId(), author: cleanMetadata(displayName()), body: thread.format === "markdown" ? value.trim() : cleanMetadata(value) }, thread.format || "tex");
   state.view.dispatch({
     changes: { from: thread.replyInsertAt, to: thread.replyInsertAt, insert: reply },
     annotations: reviewMutation.of(true),
@@ -2653,7 +2676,7 @@ function openReplyComposer(article: HTMLElement, threadId: string): void {
   input.focus();
 }
 
-let projectReviewFiles: Array<{ path: string; reviews: ReturnType<typeof parseReviews> }> = [];
+let projectReviewFiles: Array<{ path: string; reviews: ReturnType<typeof parseReviews>; archived?: ArchivedComment[] }> = [];
 let reviewProjectId = "";
 let reviewRequestVersion = 0;
 let editingComment: { id: string; path: string } | null = null;
@@ -2668,7 +2691,7 @@ function renderReviews() {
   if (!state.projectId) return;
   const projectId = state.projectId;
   const version = ++reviewRequestVersion;
-  request<{ files: typeof projectReviewFiles }>("v1/reviews").then(result => {
+  request<{ files: typeof projectReviewFiles }>("v1/reviews?resolved=1").then(result => {
     if (state.projectId !== projectId || version !== reviewRequestVersion) return;
     projectReviewFiles = result.files;
     drawReviews();
@@ -2692,7 +2715,8 @@ function drawReviews() {
   const composer = elements.review_list.querySelector<HTMLElement>(".comment-reply-form");
   if (composer && composer.closest<HTMLElement>(".review-item")?.dataset.filePath === state.activeFile) return;
   const files = projectReviewFiles.filter(file => file.path !== state.activeFile);
-  if (state.view) files.unshift({ path: state.activeFile, reviews: parseReviews(state.view.state.doc.toString()) });
+  if (state.view) files.unshift({ path: state.activeFile, reviews: parseReviews(state.view.state.doc.toString()), archived: parseArchivedComments(state.view.state.doc.toString()) });
+  const archived = files.flatMap(file => (file.archived || []).map(thread => ({ ...thread, path: file.path })));
   const groups: ReviewGroup[] = [];
   for (const file of files) {
     const revisions = new Map<string, ReviewGroup>();
@@ -2710,7 +2734,7 @@ function drawReviews() {
     }
     }
   }
-  localizedText(elements.review_count, () => String(groups.length));
+  localizedText(elements.review_count, () => String(groups.length + archived.filter(thread => thread.status === "detached").length));
   elements.review_list.replaceChildren();
   if (!groups.length) {
     const empty = document.createElement("div");
@@ -2719,7 +2743,6 @@ function drawReviews() {
     localizedText(empty.querySelector("span")!, () => t("No open reviews"));
     elements.review_list.append(empty);
     createIcons({ icons: ICONS });
-    return;
   }
   for (const group of groups) {
     const item = group.items[0];
@@ -2807,6 +2830,51 @@ function drawReviews() {
     });
     elements.review_list.append(article);
   }
+  for (const status of ["detached", "resolved"] as const) {
+    const threads = archived.filter(thread => thread.status === status);
+    if (!threads.length) continue;
+    const section = document.createElement("details");
+    section.className = "comment-archive mt-3 min-w-0 border-t pt-3";
+    section.dataset.status = status;
+    section.open = status === "detached";
+    const summary = document.createElement("summary");
+    summary.className = "cursor-pointer text-sm font-medium";
+    localizedText(summary, () => (status === "resolved" ? t("Resolved") : t("Detached comments")) + " (" + threads.length + ")");
+    section.append(summary);
+    for (const thread of threads) {
+      const article = document.createElement("article");
+      article.className = "archived-comment mt-2 min-w-0 rounded-md border p-3 [overflow-wrap:anywhere]";
+      article.dataset.reviewId = thread.id;
+      article.dataset.filePath = thread.path;
+      const meta = document.createElement("p");
+      meta.className = "mb-2 text-xs text-muted-foreground";
+      localizedText(meta, () => thread.path + " · " + thread.changedBy + " · " + new Date(thread.changedAt).toLocaleString());
+      const quote = document.createElement("pre");
+      quote.className = "mb-2 whitespace-pre-wrap text-xs text-muted-foreground";
+      localizedText(quote, () => thread.body.slice(0, 240));
+      article.append(meta, quote);
+      for (const message of [{ author: thread.author, body: thread.note }, ...thread.replies]) {
+        const row = document.createElement("p");
+        row.className = "comment-message mb-2 whitespace-pre-wrap text-sm";
+        localizedText(row, () => message.author + ": " + message.body);
+        article.append(row);
+      }
+      if (state.projectCanEdit) {
+        const reopen = reviewButton("Reopen", async () => {
+          if (!await selectReviewFile(thread.path) || !state.view) return;
+          const source = state.view.state.doc.toString();
+          const current = parseArchivedComments(source).find(item => item.id === thread.id && item.changedAt === thread.changedAt);
+          const changes = current && reopenCommentChanges(source, current, reviewFormat(thread.path));
+          if (!changes) { showToast(t("The original text is missing or ambiguous.")); return; }
+          state.view.dispatch({ changes, annotations: reviewMutation.of(true) });
+          renderReviews();
+        });
+        article.append(reopen);
+      }
+      section.append(article);
+    }
+    elements.review_list.append(section);
+  }
 }
 
 let reviewRenderTimer: ReturnType<typeof setTimeout> | undefined;
@@ -2865,14 +2933,16 @@ elements.review_form.addEventListener("submit", (event: Event) => {
     const item = parseReviews(state.view.state.doc.toString())
       .find(candidate => candidate.kind === "comment" && candidate.id === editingComment?.id);
     if (!item || item.noteFrom === null || item.noteTo === null || editingComment.path !== state.activeFile) return;
-    state.view.dispatch({ changes: { from: item.noteFrom, to: item.noteTo, insert: cleanMetadata(value) }, annotations: reviewMutation.of(true) });
+    state.view.dispatch({ changes: { from: item.noteFrom, to: item.noteTo, insert: item.format === "markdown" ? encodeReviewValue(value.trim()) : cleanMetadata(value) }, annotations: reviewMutation.of(true) });
     editingComment = null;
   } else {
     const review = state.reviewSelection;
     if (!review) return;
     const id = randomId();
     const author = cleanMetadata(displayName());
-    const inserted = `\\cmtbg{${id}}{${author}}${review.selected}\\cmted{${cleanMetadata(value)}}`;
+    const format = reviewFormat(state.activeFile);
+    const markers = reviewMarkers("comment", id, author, format, format === "markdown" ? value.trim() : cleanMetadata(value));
+    const inserted = markers.opening + review.selected + markers.closing;
     state.view.dispatch({
       changes: { from: review.from, to: review.to, insert: inserted },
       annotations: reviewMutation.of(true),

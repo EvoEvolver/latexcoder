@@ -8,7 +8,7 @@ import * as syncProtocol from "y-protocols/sync";
 import { WebSocket } from "ws";
 import * as Y from "yjs";
 import { fileChanges } from "../shared/file-diff.ts";
-import { parseReviews } from "../shared/review.ts";
+import { normalizeMarkdownReviews, parseReviews, reviewFormat, reviewMarkers } from "../shared/review.ts";
 import type { StateDatabase } from "./database.ts";
 import { agentAuthor, apiError, atomicWriteSync, isTextFile, isUnicodeBoundary, isWellFormedUtf16, MAX_PATCH_CHANGES, MAX_TEXT_BYTES, roomNameForPath, sha256 } from "./core.ts";
 import { attributedRuns, blameAttributes, LEGACY_ACTOR, LEGACY_CHANGE_ID, readBlameAttributes, type BlameAttribution } from "../shared/blame.ts";
@@ -99,6 +99,14 @@ export function createCollaborationStore(projectId: string, projectDir: string, 
       doc.getText("content").insert(0, source, legacyAttributes());
     }
     const text = doc.getText("content");
+    const original = text.toString(), normalized = normalizeMarkdownReviews(original, relativePath);
+    if (normalized !== original) {
+      for (const change of fileChanges(original, normalized).reverse()) {
+        if (change.to > change.from) text.delete(change.from, change.to - change.from);
+        if (change.insert) text.insert(change.from, change.insert, legacyAttributes());
+      }
+      atomicWriteSync(target, normalized);
+    }
     let position = 0, seededLegacy = false;
     doc.transact(() => {
       for (const operation of text.toDelta() as TextDelta[]) {
@@ -110,7 +118,7 @@ export function createCollaborationStore(projectId: string, projectDir: string, 
         position += operation.insert.length;
       }
     }, BLAME_ORIGIN);
-    if (seededLegacy) database.saveYjsSnapshot(projectId, relativePath, Y.encodeStateAsUpdate(doc));
+    if (seededLegacy || normalized !== original) database.saveYjsSnapshot(projectId, relativePath, Y.encodeStateAsUpdate(doc));
     shared = { relativePath, doc, awareness: new awarenessProtocol.Awareness(doc), connections: new Map(), persistTimer: undefined, removed: false, saveRequests: new Map() };
     shared.awareness.setLocalState(null);
     text.observe((event, transaction) => {
@@ -217,6 +225,7 @@ export function createCollaborationStore(projectId: string, projectDir: string, 
   }
 
   function replaceText(relativePath: string, source: string, actor: BlameActor = { id: "api", name: "API editor" }): boolean {
+    source = normalizeMarkdownReviews(source, relativePath);
     const retained = docs.has(relativePath);
     const target = path.join(projectDir, relativePath);
     if (!existsSync(target)) { mkdirSync(path.dirname(target), { recursive: true }); writeFileSync(target, ""); }
@@ -243,6 +252,7 @@ export function createCollaborationStore(projectId: string, projectDir: string, 
   }
 
   function importText(relativePath: string, source: string, actor: BlameActor = { id: "git", name: "Git import" }): void {
+    source = normalizeMarkdownReviews(source, relativePath);
     const target = path.join(projectDir, relativePath);
     if (!existsSync(target)) { mkdirSync(path.dirname(target), { recursive: true }); writeFileSync(target, ""); }
     const shared = load(relativePath), text = shared.doc.getText("content");
@@ -280,10 +290,17 @@ export function createCollaborationStore(projectId: string, projectDir: string, 
       for (const change of changes) {
         if (reviews.some(item => change.from < item.to && change.to > item.from)) throw apiError("review_conflict", "suggesting patches cannot overlap an open review", 409);
         const id = `r${randomUUID().replaceAll("-", "")}`, deleted = source.slice(change.from, change.to);
-        change.insert = `${deleted ? `\\delbg{${id}}{${author}}${deleted}\\deled{}` : ""}${change.insert ? `\\addbg{${id}}{${author}}${change.insert}\\added{}` : ""}`;
+        const format = reviewFormat(relativePath);
+        const deletion = reviewMarkers("deletion", id, author, format), addition = reviewMarkers("addition", id, author, format);
+        change.insert = (deleted ? deletion.opening + deleted + deletion.closing : "")
+          + (change.insert ? addition.opening + change.insert + addition.closing : "");
         suggestionIds.push(id);
       }
     }
+    let projectedSource = source;
+    for (const change of [...changes].reverse()) projectedSource = projectedSource.slice(0, change.from) + change.insert + projectedSource.slice(change.to);
+    const normalized = normalizeMarkdownReviews(projectedSource, relativePath);
+    if (normalized !== projectedSource) changes.splice(0, changes.length, ...fileChanges(source, normalized).map((change, index) => ({ ...change, index })));
     let projectedBytes = Buffer.byteLength(source);
     for (const change of changes) projectedBytes += Buffer.byteLength(change.insert) - Buffer.byteLength(source.slice(change.from, change.to));
     if (projectedBytes > MAX_TEXT_BYTES) throw apiError("file_too_large", "patched text file is too large", 413);
@@ -301,7 +318,7 @@ export function createCollaborationStore(projectId: string, projectDir: string, 
     const mode: EditMode = options.mode ?? "direct";
     if (!['direct', 'suggesting'].includes(mode)) throw apiError("invalid_mode", "mode must be suggesting or direct");
     if (mode === "suggesting") agentAuthor(options.agent);
-    const changes = fileChanges(source, updated);
+    const changes = fileChanges(source, normalizeMarkdownReviews(updated, relativePath));
     if (!changes.length) return { source, sha256: currentSha256, mode, suggestionIds: [], changeCount: 0 };
     return { ...patchText(relativePath, baseSha256, changes, { ...options, mode }), changeCount: changes.length };
   }

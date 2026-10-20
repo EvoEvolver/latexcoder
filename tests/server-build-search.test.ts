@@ -222,7 +222,7 @@ test("search API kills timed-out bubblewrap processes", async () => {
   try {
     const bwrap = await createFakeBwrap(sandboxDir);
     const slowRg = path.join(sandboxDir, "rg-slow");
-    await writeFile(slowRg, "#!/bin/sh\nsleep 5\n", "utf8");
+    await writeFile(slowRg, '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "ripgrep test"; exit 0; fi\nexec sleep 5\n', "utf8");
     await chmod(slowRg, 0o755);
     await withServer(async ({ base }) => {
       const startedAt = Date.now();

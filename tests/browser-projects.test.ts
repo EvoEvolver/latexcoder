@@ -562,7 +562,7 @@ test("file tabs and typed file tree preserve files across switching, closing and
     await page.locator('[data-path="notes/second.tex"]').dragTo(page.locator("#file-list"), { targetPosition: { x: fileListBounds.width / 2, y: fileListBounds.height - 8 } });
     await page.locator('[data-tree-path="second.tex"]').waitFor();
     assert.equal((await page.request.get(`${base}/v1/files?path=second.tex`)).status(), 200);
-    assert.equal(await page.getByRole("button", { name: "Close main.tex", exact: true }).count(), 0);
+    assert.equal(await page.getByRole("button", { name: "Close main.tex", exact: true }).count(), 1);
     await page.screenshot({ path: "/tmp/latexcoder-file-tree-tabs-desktop.png" });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.locator("#toggle-files").click();

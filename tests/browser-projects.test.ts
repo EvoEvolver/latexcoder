@@ -36,7 +36,7 @@ test("Markdown files switch between live source and sanitized project-aware prev
     const { defaultProjectId: id } = await (await page.request.get(`${base}/v1/projects`)).json();
     const markdown = `# Project Notes
 
-An **important** result with a [linked chapter](chapter.md).
+An **important** \\cmtbg{t1}{Ada}result\\cmted{Which one?} with a [linked chapter](chapter.md).
 
 - [x] Reproduce the experiment
 
@@ -54,7 +54,7 @@ An **important** result with a [linked chapter](chapter.md).
     await page.goto(`${base}/projects/${id}?e2e=1`);
     await page.waitForFunction(() => document.querySelector("#sync-state")?.textContent === "Saved live");
     await page.locator('[title="notes"]').click();
-    await page.locator('[title="notes/README.md"]').click();
+    await page.locator('[data-tree-path="notes/README.md"]').click();
     await page.waitForFunction(() => globalThis.__paperE2E.state.activeFile === "notes/README.md" && globalThis.__paperE2E.state.provider?.synced);
     assert.equal(await page.locator("#markdown-view-switch").isVisible(), true);
     await page.locator("#markdown-rendered").click();
@@ -65,6 +65,9 @@ An **important** result with a [linked chapter](chapter.md).
     assert.equal(await page.locator("#markdown-preview table").count(), 1);
     assert.equal(await page.locator('#markdown-preview input[type="checkbox"]:checked').count(), 1);
     assert.equal(await page.locator("#markdown-preview script").count(), 0);
+    const previewText = await page.locator("#markdown-preview").innerText();
+    assert.match(previewText, /important result with a linked chapter/);
+    assert.doesNotMatch(previewText, /cmtbg|cmted|Which one\?/);
     assert.equal(await page.evaluate(() => (window as typeof window & { __markdownScriptRan?: boolean }).__markdownScriptRan), undefined);
     await page.waitForFunction(() => (document.querySelector("#markdown-preview img") as HTMLImageElement | null)?.naturalWidth === 1);
     await page.screenshot({ path: "/tmp/latexcoder-markdown-preview.png" });

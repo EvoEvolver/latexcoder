@@ -100,6 +100,23 @@ test("Agent conflict diagnostics return the latest source and diff without writi
   });
 });
 
+test("full-file edit reports the reviews an upload removed", async () => {
+  await withServer(async ({ base }) => {
+    const reviewed = "Intro \\cmtbg{t1}{Ada}old claim\\cmted{Cite this} and \\addbg{s1}{Bob}new\\added{} text.\n";
+    await fetch(`${base}/v1/files?path=main.tex`, { method: "PUT", body: reviewed });
+    const upload = (body: string, base256: string) => fetch(`${base}/v1/files/edit?path=main.tex`, {
+      method: "POST", headers: { "X-Base-SHA256": base256, "Content-Type": "text/plain" }, body,
+    });
+    const kept = await upload(reviewed.replace("Intro", "Opening"), sha256(reviewed));
+    assert.equal(kept.status, 200);
+    const keptBody = await kept.json();
+    assert.deepEqual(keptBody.edit.removedReviews, []);
+    const rewritten = await upload("Opening rewritten paragraph and \\addbg{s1}{Bob}new\\added{} text.\n", keptBody.file.sha256);
+    assert.equal(rewritten.status, 200);
+    assert.deepEqual((await rewritten.json()).edit.removedReviews, [{ id: "t1", kind: "comment" }]);
+  });
+});
+
 test("full-file edit computes Yjs changes atomically and rejects live stale hashes", async () => {
   await withServer(async ({ base, ws, projectDir, collaboration }) => {
     const room = Buffer.from("main.tex").toString("base64url");

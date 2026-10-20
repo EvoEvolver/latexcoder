@@ -765,6 +765,10 @@ The diagnostic endpoint never writes or automatically retries an edit.
 ${proposal
     ? "Uploads through this capability are always reviewable suggestions, even if a request asks for direct mode. The response returns the generated suggestion IDs. Suggestions may not overlap existing open reviews."
     : "Uploads are direct edits by default. To create reviewable suggestions, append &mode=suggesting&agentId=ag_uniqueid&agentName=Agent%20Name to the upload URL. The response returns the resulting file hash and generated suggestion IDs. Suggestion uploads may not overlap existing open reviews."}
+The response's edit.removedReviews lists every comment or suggestion (id and
+kind) that existed before the upload and is gone after it. If it is not empty
+and the user did not ask to resolve those reviews, restore them from the
+version saved before your edit.
 
 ${proposal ? "" : `## Reply To An Inline Comment
 

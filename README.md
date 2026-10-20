@@ -157,7 +157,9 @@ docker run --rm \
 ```
 
 The seccomp override lets bubblewrap create the namespaces used by sandboxed
-regex search; skip it if you only need literal search.
+Agent and regex search; the host must also allow unprivileged user namespaces.
+Startup probes the sandbox and reports failures in the health dependency report.
+Unavailable sandboxes return HTTP 503; literal editor search still works.
 
 For Railway, use the deploy button above, attach a persistent volume at
 `/data`, and set `LATEXCODER_ADMIN_PASSWORD`. Set the HTTP domain target port

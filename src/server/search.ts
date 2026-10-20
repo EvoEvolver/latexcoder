@@ -16,7 +16,7 @@ export function createProjectSearch(options: SearchOptions = {}) {
     const matches: SearchMatch[] = [];
     if (regex) {
       const result = await runRipgrep(runtime.projectDir, ["--no-config", "--json", "--threads=4", "--one-file-system", ...(caseSensitive ? [] : ["--ignore-case"]), "--glob=!.git/**", "--regexp", query, "--", selectedPath || "."], { bwrap: options.bwrap, rg: options.rg, timeoutMs: options.searchTimeoutMs });
-      if (result.code !== 0 && result.code !== 1) throw apiError("invalid_query", result.stderr.toString(), 422);
+      if (result.code !== 0 && (result.code !== 1 || result.stderr.length)) throw apiError("invalid_query", result.stderr.toString(), 422);
       for (const row of result.stdout.toString().split("\n")) {
         if (!row) continue;
         const event = JSON.parse(row);

@@ -111,7 +111,11 @@ export async function runRipgrep(projectDir: string, args: string[], options: Ri
       clearTimeout(timer); if (settled) return; settled = true;
       if (limitExceeded) return reject(apiError("search_output_too_large", "ripgrep output exceeded 4 MiB", 413));
       if (timedOut) return reject(apiError("search_timeout", `ripgrep exceeded the ${timeoutMs}ms search limit`, 408));
-      resolve({ code, stdout: Buffer.concat(stdout), stderr: Buffer.concat(stderr) });
+      const errorOutput = Buffer.concat(stderr);
+      if (code !== 0 && /^bwrap:/m.test(errorOutput.toString())) {
+        return reject(apiError("search_sandbox_unavailable", "Project search sandbox could not start: " + errorOutput.toString().trim(), 503));
+      }
+      resolve({ code, stdout: Buffer.concat(stdout), stderr: errorOutput });
     });
   });
 }

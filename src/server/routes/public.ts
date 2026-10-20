@@ -93,7 +93,8 @@ export function registerPublicRoutes(app: RouteApp, context: PublicRouteContext)
       const share = proposal ? context.findProposalShare(runtime, request.params.token) : context.findEditShare(runtime, request.params.token);
       if (!share) throw apiError("agent_link_invalid", "Agent link is invalid", 403);
       response.setHeader("Cache-Control", "no-store");
-      response.type("text/plain; charset=utf-8").send(context.agentProjectManual(runtime, await listFiles(runtime.projectDir), String(request.params.token), `${request.protocol}://${request.get("host")}`, proposal));
+      const protocol = request.secure || request.get("x-forwarded-proto")?.split(",")[0]?.trim() === "https" ? "https" : request.protocol;
+      response.type("text/plain; charset=utf-8").send(context.agentProjectManual(runtime, await listFiles(runtime.projectDir), String(request.params.token), `${protocol}://${request.get("host")}`, proposal));
     } catch (error) { next(error); }
   });
   app.get("/health/live", (_request, response) => response.json({ ok: true, status: "live", name: "latexcoder" }));

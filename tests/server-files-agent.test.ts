@@ -117,6 +117,22 @@ test("full-file edit reports the reviews an upload removed", async () => {
   });
 });
 
+test("removed reviews distinguish the two halves of a replacement suggestion", async () => {
+  await withServer(async ({ base }) => {
+    const deletion = "\\delbg{s1}{Ada}old\\deled{}";
+    const addition = "\\addbg{s1}{Ada}new\\added{}";
+    for (const [source, removedKind] of [[addition, "deletion"], [deletion, "addition"]]) {
+      const original = deletion + addition;
+      await fetch(base + "/v1/files?path=main.tex", { method: "PUT", body: original });
+      const response = await fetch(base + "/v1/files/edit?path=main.tex", {
+        method: "POST", headers: { "X-Base-SHA256": sha256(original), "Content-Type": "text/plain" }, body: source,
+      });
+      assert.equal(response.status, 200);
+      assert.deepEqual((await response.json()).edit.removedReviews, [{ id: "s1", kind: removedKind }]);
+    }
+  });
+});
+
 test("full-file edit computes Yjs changes atomically and rejects live stale hashes", async () => {
   await withServer(async ({ base, ws, projectDir, collaboration }) => {
     const room = Buffer.from("main.tex").toString("base64url");

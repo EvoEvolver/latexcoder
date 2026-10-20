@@ -140,8 +140,8 @@ export function registerFileRoutes(app: RouteApp, context: FileRouteContext): vo
         const version = await context.gitCheckpoint(runtime, `Agent edit: ${relativePath}`, { kind: "agent", main: runtime.build.main, agentId: agent?.id, agentName: agent?.name || "Coding agent", mode });
         // A full-file upload can drop review storage silently; report which
         // threads and suggestions are gone so the agent can tell if it meant to.
-        const remaining = new Set(parseReviews(result.source).map(item => item.id));
-        const removedReviews = reviewsBefore.filter(item => !remaining.has(item.id)).map(({ id, kind }) => ({ id, kind }));
+        const remaining = new Set(parseReviews(result.source).map(item => JSON.stringify([item.id, item.kind])));
+        const removedReviews = reviewsBefore.filter(item => !remaining.has(JSON.stringify([item.id, item.kind]))).map(({ id, kind }) => ({ id, kind }));
         return { result, version: result.changeCount ? version.commit : null, removedReviews };
       }));
       response.setHeader("ETag", `"${result.sha256}"`);

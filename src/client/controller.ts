@@ -1970,7 +1970,9 @@ function renderMarkdownPreview(): void {
       container: elements.markdown_preview_content,
       files: state.files,
       fileUrl: relativePath => projectApiUrl(`v1/files?path=${encodeURIComponent(relativePath)}`).toString(),
-      source: state.view.state.doc.toString(),
+      // Review storage is LaTeX macros even in Markdown; preview the reviewed
+      // text the same way a build projects it, without the markup.
+      source: stripReviewStorage(state.view.state.doc.toString()),
     });
   } catch (error) {
     elements.markdown_preview_content.replaceChildren();

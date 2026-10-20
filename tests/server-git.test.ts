@@ -362,6 +362,34 @@ test("Git conflicts quarantine incoming commits while Yjs stays on main", async 
   });
 });
 
+test("an adopted repository uses its root document rather than the first .tex file", async () => {
+  await withServer(async ({ base }) => {
+    const created = await fetch(`${base}/v1/projects`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Root repository", empty: true }),
+    });
+    const projectId = (await created.json()).project.id;
+    const temporary = await mkdtemp(path.join(os.tmpdir(), "latexcoder-root-test-"));
+    try {
+      const share = (await (await fetch(`${base}/v1/project/share?project=${projectId}`, { method: "POST" })).json()).share;
+      const origin = path.join(temporary, "origin");
+      await mkdir(origin, { recursive: true });
+      await testGit(origin, ["init", "-b", "main"]);
+      await writeFile(path.join(origin, "appendix.tex"), "\\section{Appendix}\n", "utf8");
+      await writeFile(path.join(origin, "paper.tex"), "\\documentclass{article}\n\\begin{document}\n\\input{appendix}\n\\end{document}\n", "utf8");
+      await testGit(origin, ["add", "-A"]);
+      await testGit(origin, ["commit", "-m", "Paper with an input file"]);
+      await testGit(origin, ["remote", "add", "latexcoder", `${base}${share.clonePath}`]);
+      await testGit(origin, ["push", "latexcoder", "main"]);
+      const detail = (await (await fetch(`${base}/v1/project?project=${projectId}`)).json()).project;
+      assert.equal(detail.main, "paper.tex");
+    } finally {
+      await rm(temporary, { recursive: true, force: true });
+    }
+  });
+});
+
 test("an empty project adopts the history of an existing repository pushed into it", async () => {
   await withServer(async ({ base }) => {
     const created = await fetch(`${base}/v1/projects`, {

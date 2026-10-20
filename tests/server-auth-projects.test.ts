@@ -42,6 +42,19 @@ test("ZIP initializes projects and imports files without overwriting", async () 
   });
 });
 
+test("ZIP import picks the root document over a package that sorts first", async () => {
+  await withServer(async ({ base }) => {
+    const archive = zipSync({
+      "paper/qcircuit.tex": strToU8("% \\documentclass{article} is not loaded here\n\\ProvidesPackage{qcircuit}\n\\usepackage{xy}\n"),
+      "paper/defs.tex": strToU8("\\usepackage{amsmath}\n"),
+      "paper/lec.tex": strToU8("\\documentclass{article}\n\\input{defs}\n\\begin{document}\nBody\n\\end{document}\n"),
+    });
+    const created = await fetch(`${base}/v1/projects?name=Root%20paper`, { method: "POST", headers: { "Content-Type": "application/zip" }, body: Buffer.from(archive) });
+    assert.equal(created.status, 201);
+    assert.equal((await created.json()).project.build.main, "lec.tex");
+  });
+});
+
 test("root negotiates Agent and human representations", async () => {
   await withServer(async ({ base }) => {
     const root = await fetch(`${base}/`);

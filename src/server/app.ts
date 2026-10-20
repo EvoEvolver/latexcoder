@@ -11,7 +11,7 @@ import { WebSocketServer } from "ws";
 import { createGitSshServer, sshPublicEndpoint, type SshGitRunner } from "./git-ssh.ts";
 import { StateDatabase } from "./database.ts";
 import { parseReviews } from "../shared/review.ts";
-import { apiError, isTextFile, MAX_FILE_BYTES, MAX_TEXT_BYTES, parseCookies, passwordRecord, pathFromRoomName, randomToken, safeRelativePath, sessionCookie, sha256, validatePassword } from "./core.ts";
+import { apiError, isRootDocument, isTextFile, MAX_FILE_BYTES, MAX_TEXT_BYTES, parseCookies, passwordRecord, pathFromRoomName, randomToken, safeRelativePath, sessionCookie, sha256, validatePassword } from "./core.ts";
 import { listFiles, listFolders } from "./project-files.ts";
 import { run, runBinary } from "./process.ts";
 import { createCollaborationStore } from "./collaboration.ts";
@@ -358,16 +358,20 @@ async function withTemporaryWorktree<T>(runtime: ProjectRuntime, commit: string,
 }
 
 // The pushed repository decides its own entry point: keep the configured main
-// document when it exists, otherwise prefer main.tex and fall back to the first
-// .tex file in the tree. A repository without any .tex file keeps the default
-// and the project opens without a main document until one is chosen.
+// document when it exists, otherwise prefer main.tex, then the first .tex file
+// that is a root document, and fall back to the first .tex file in the tree. A
+// repository without any .tex file keeps the default and the project opens
+// without a main document until one is chosen.
 async function incomingMainDocument(runtime: ProjectRuntime, commit: string): Promise<string> {
   const output = (await git(runtime.projectDir, ["ls-tree", "-r", "--name-only", "-z", commit])).output;
   const files = output ? output.split("\0").filter(Boolean) : [];
   if (files.includes(runtime.build.main)) return runtime.build.main;
-  return files.find(file => file === "main.tex")
-    || files.filter(file => file.endsWith(".tex")).sort((left, right) => left.split("/").length - right.split("/").length || left.localeCompare(right))[0]
-    || runtime.build.main;
+  if (files.includes("main.tex")) return "main.tex";
+  const texFiles = files.filter(file => file.endsWith(".tex")).sort((left, right) => left.split("/").length - right.split("/").length || left.localeCompare(right));
+  for (const file of texFiles) {
+    if (isRootDocument((await git(runtime.projectDir, ["show", `${commit}:${file}`])).output)) return file;
+  }
+  return texFiles[0] || runtime.build.main;
 }
 
 async function gitSyncLocked(runtime: ProjectRuntime, requestedRef: string, blameActor?: BlameActor) {
@@ -1176,8 +1180,10 @@ export async function createPaperServer(options: ServerOptions = {}): Promise<Pa
       database.createProject(metadata);
       const runtime = await loadProject(id);
       if (importedFiles.length) {
+        const texFiles = importedFiles.filter(file => file.relativePath.endsWith(".tex"));
         const main = importedFiles.find(file => file.relativePath === "main.tex")
-          || importedFiles.find(file => file.relativePath.endsWith(".tex"));
+          || texFiles.find(file => isRootDocument(Buffer.from(file.content).toString("utf8")))
+          || texFiles[0];
         if (main) { runtime.build.main = main.relativePath; database.saveBuild(id, runtime.build); }
       }
       return runtime;

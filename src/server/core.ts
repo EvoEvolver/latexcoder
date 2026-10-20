@@ -31,6 +31,14 @@ export function isTextFile(relativePath: string): boolean {
   return TEXT_EXTENSIONS.has(path.extname(relativePath).toLowerCase());
 }
 
+// A compilable root document declares its class and opens the document body;
+// \input chapters and project-local packages such as qcircuit.tex do neither.
+// Comments are dropped first so a commented-out preamble does not count.
+export function isRootDocument(source: string): boolean {
+  const code = source.replace(/(^|[^\\])%.*$/gm, "$1");
+  return /\\documentclass\b/.test(code) && /\\begin\s*\{document\}/.test(code);
+}
+
 export function readProjectZip(body: Uint8Array): ImportedProjectFile[] {
   let total = 0, count = 0, files;
   try {

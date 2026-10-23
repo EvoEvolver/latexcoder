@@ -2642,6 +2642,19 @@ function reviewButton(label: string, action: () => void | Promise<void>): HTMLBu
   return button;
 }
 
+function submitCommentOnEnter(input: HTMLTextAreaElement, form: HTMLFormElement): void {
+  let composing = false;
+  input.addEventListener("compositionstart", () => { composing = true; });
+  input.addEventListener("compositionend", () => { composing = false; });
+  input.addEventListener("keydown", event => {
+    // Some IMEs end composition before the confirming keydown and only mark
+    // that key with the legacy 229 code (not isComposing).
+    if (event.key !== "Enter" || event.shiftKey || composing || event.isComposing || event.keyCode === 229) return;
+    event.preventDefault();
+    form.requestSubmit();
+  });
+}
+
 function openReplyComposer(article: HTMLElement, threadId: string): void {
   const existing = article.querySelector(".comment-reply-form");
   if (existing) return existing.querySelector("textarea").focus();
@@ -2667,11 +2680,7 @@ function openReplyComposer(article: HTMLElement, threadId: string): void {
     form.remove();
     if (appendCommentReply(threadId, input.value)) showToast(t("Reply added."));
   });
-  input.addEventListener("keydown", event => {
-    if (event.key !== "Enter" || event.shiftKey) return;
-    event.preventDefault();
-    form.requestSubmit();
-  });
+  submitCommentOnEnter(input, form);
   article.querySelector(".review-buttons").before(form);
   input.focus();
 }
@@ -2918,11 +2927,7 @@ function openReviewDialog() {
   elements.review_text.select();
 }
 
-elements.review_text.addEventListener("keydown", event => {
-  if (event.key !== "Enter" || event.shiftKey) return;
-  event.preventDefault();
-  (elements.review_form as HTMLFormElement).requestSubmit();
-});
+submitCommentOnEnter(elements.review_text, elements.review_form as HTMLFormElement);
 
 elements.review_form.addEventListener("submit", (event: Event) => {
   event.preventDefault();
@@ -4818,7 +4823,7 @@ async function goToPdf(view: EditorView) {
   const { from, to } = view.state.selection.main;
   const line = view.state.doc.lineAt(from).number;
   selectOutput("pdf");
-  localizedText(elements.pdf_status, () => t("Locating source; updating PDF if needed..."));
+  localizedText(elements.pdf_status, () => t("Locating source in PDF..."));
   let position;
   try {
     position = await request<PdfPosition>(buildEndpoint("v1/build/position"), {

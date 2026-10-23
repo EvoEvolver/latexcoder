@@ -73,24 +73,35 @@ export function registerBuildRoutes(app: RouteApp, context: BuildRouteContext): 
       const { line, source, from, to } = request.body || {};
       if (!file.endsWith(".tex") || !Number.isSafeInteger(line) || line < 1 || typeof source !== "string") throw apiError("invalid_position", "Expected a LaTeX file, source, and positive line number");
       if (runtime.collaboration.readText(file) !== source) throw apiError("stale_source", "The source changed. Try navigating again.", 409);
-      await context.ensureLatestPdf(runtime);
-      if (!existsSync(path.join(runtime.buildDir, "latest.synctex.gz"))) await context.compileProject(runtime, runtime.build.main);
-      if (!existsSync(path.join(runtime.buildDir, "latest.synctex.gz"))) throw apiError("synctex_missing", "The compiler did not produce SyncTeX data", 409);
-      let snapshot = JSON.parse(await readFile(path.join(runtime.buildDir, "source-map.json"), "utf8"));
-      if (snapshot.files[file]?.source !== source) {
-        const result = await context.compileProject(runtime, runtime.build.main);
-        if (!result.success) throw apiError("compile_failed", "Compilation failed while locating the PDF position", 422);
-        snapshot = JSON.parse(await readFile(path.join(runtime.buildDir, "source-map.json"), "utf8"));
+      // Navigate the last successful build even while editing, compiling, or
+      // recovering from an error. Only compile when there is no usable cache.
+      if (!["latest.pdf", "latest.synctex.gz", "source-map.json"].every(file => existsSync(path.join(runtime.buildDir, file)))) {
+        await context.ensureLatestPdf(runtime);
+        if (!existsSync(path.join(runtime.buildDir, "latest.synctex.gz"))) await context.compileProject(runtime, runtime.build.main);
       }
+      if (!existsSync(path.join(runtime.buildDir, "latest.synctex.gz"))) throw apiError("synctex_missing", "The compiler did not produce SyncTeX data", 409);
+      const snapshot = JSON.parse(await readFile(path.join(runtime.buildDir, "source-map.json"), "utf8"));
       const map = snapshot.files[file];
       if (!map) throw apiError("source_not_found", "This file is not part of the compiled document", 404);
-      if (map.source !== source || runtime.collaboration.readText(file) !== source) throw apiError("stale_source", "The source changed. Try navigating again.", 409);
+      if (runtime.collaboration.readText(file) !== source) throw apiError("stale_source", "The source changed. Try navigating again.", 409);
+      const stale = map.source !== source;
+      const compiledLine = stale ? followLine(source, map.source, line) : line;
       let projectedLine = 1;
       for (let index = 0; index < map.lines.length; index++) {
-        if (Math.abs(map.lines[index] - line) < Math.abs(map.lines[projectedLine - 1] - line)) projectedLine = index + 1;
+        if (Math.abs(map.lines[index] - compiledLine) < Math.abs(map.lines[projectedLine - 1] - compiledLine)) projectedLine = index + 1;
       }
-      const start = Number.isSafeInteger(from) && from >= 0 && from <= source.length ? projectedPosition(source, from) : { line: projectedLine, column: 0 };
-      const end = Number.isSafeInteger(to) && to >= (from || 0) && to <= source.length ? projectedPosition(source, to) : start;
+      const compiledLines: string[] = map.source.split("\n");
+      const position = (offset: number) => {
+        if (!stale) return projectedPosition(source, offset);
+        const prefix = source.slice(0, offset);
+        const targetLine = Math.min(compiledLines.length, followLine(source, map.source, prefix.split("\n").length));
+        const column = offset - prefix.lastIndexOf("\n") - 1;
+        const compiledOffset = compiledLines.slice(0, targetLine - 1).reduce((length, text) => length + text.length + 1, 0)
+          + Math.min(column, compiledLines[targetLine - 1].length);
+        return projectedPosition(map.source, compiledOffset);
+      };
+      const start = Number.isSafeInteger(from) && from >= 0 && from <= source.length ? position(from) : { line: projectedLine, column: 0 };
+      const end = Number.isSafeInteger(to) && to >= (from || 0) && to <= source.length ? position(to) : start;
       const boxes = [];
       try {
         for (let batch = start.line; batch <= Math.min(end.line, start.line + 19); batch += 4) {
@@ -99,12 +110,12 @@ export function registerBuildRoutes(app: RouteApp, context: BuildRouteContext): 
           for (const result of results) boxes.push(...syncTexPositions(result.output));
         }
       } catch { throw apiError("synctex_unavailable", "SyncTeX is not installed on the server", 503); }
-      if (runtime.compilePromise || snapshot.revision !== runtime.build.sourceRevision || runtime.collaboration.readText(file) !== source) throw apiError("stale_source", "The source or PDF changed. Try navigating again.", 409);
+      if (snapshot.revision !== runtime.build.sourceRevision || runtime.collaboration.readText(file) !== source) throw apiError("stale_source", "The source or PDF changed. Try navigating again.", 409);
       const unique = [...new Map(boxes.map(box => [JSON.stringify(box), box])).values()].slice(0, 200);
       if (!unique.length) throw apiError("source_not_found", "No PDF position for this source", 404);
       const { page, x, y } = unique[0];
       response.setHeader("Cache-Control", "no-store");
-      response.json({ page, x, y, boxes: unique, revision: snapshot.revision });
+      response.json({ page, x, y, boxes: unique, revision: snapshot.revision, stale });
     } catch (error) { next(error); }
   });
   app.post("/v1/build/source", json({ limit: "16kb" }), async (request, response, next) => {

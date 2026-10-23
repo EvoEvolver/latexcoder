@@ -1,9 +1,52 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { withEditor } from "./helpers/browser.ts";
+import { selectionContextMenu, withEditor } from "./helpers/browser.ts";
 import { parseArchivedComments, parseReviews, stripReviewStorage } from "../src/shared/review.ts";
 
 const reviewed = "Before \\cmtbg{t1}{Ada}old claim\\cmted{Please clarify\\cmtrpl{r1}{Bob}{Agreed}} after";
+
+test("comment creation, edits and replies submit only outside IME composition", async () => {
+  await withEditor(async ({ page, base }) => {
+    await page.request.put(base + "/v1/files?path=main.tex", { data: "A claim.", headers: { "Content-Type": "text/plain" } });
+    await page.goto(base + "/?e2e=1");
+    await page.waitForFunction(() => globalThis.__paperE2E?.state.provider?.synced);
+    await selectionContextMenu(page, "claim", false);
+    await page.locator('[data-editor-action="comment"]').click();
+    const source = () => page.evaluate(() => globalThis.__paperE2E.state.view.state.doc.toString());
+    const composingEnter = async (selector: string) => {
+      const input = page.locator(selector);
+      await input.dispatchEvent("compositionstart", { data: "" });
+      await input.dispatchEvent("keydown", { key: "Enter", isComposing: true });
+      await input.dispatchEvent("keydown", { key: "Enter" }); // IMEs without isComposing.
+      assert.equal(await input.isVisible(), true);
+      await input.dispatchEvent("compositionend", { data: "中文" });
+      await input.dispatchEvent("keydown", { key: "Enter", keyCode: 229 }); // Safari ordering.
+      assert.equal(await input.isVisible(), true);
+    };
+    await page.locator("#review-text").fill("中文评论");
+    await composingEnter("#review-text");
+    assert.equal(parseReviews(await source()).length, 0);
+    await page.locator("#review-text").press("Shift+Enter");
+    assert.equal(await page.locator("#review-dialog").isVisible(), true);
+    await page.locator("#review-text").press("Enter");
+    assert.equal(parseReviews(await source())[0].note, "中文评论");
+
+    if (!await page.locator("#review-pane").isVisible()) await page.locator("#toggle-review").click();
+    await page.locator(".review-item.comment").getByRole("button", { name: "Edit", exact: true }).click();
+    await page.locator("#review-text").fill("修改后的评论");
+    await composingEnter("#review-text");
+    assert.equal(parseReviews(await source())[0].note, "中文评论");
+    await page.locator("#review-text").press("Enter");
+    assert.equal(parseReviews(await source())[0].note, "修改后的评论");
+
+    await page.locator(".review-item.comment").getByRole("button", { name: "Reply", exact: true }).click();
+    await page.locator(".comment-reply-form textarea").fill("中文回复");
+    await composingEnter(".comment-reply-form textarea");
+    assert.equal(parseReviews(await source())[0].replies.length, 0);
+    await page.locator(".comment-reply-form textarea").press("Enter");
+    assert.equal(parseReviews(await source())[0].replies[0].body, "中文回复");
+  });
+});
 
 test("paragraph replacement re-anchors a thread, Resolve archives it, and Reopen survives reload", async () => {
   await withEditor(async ({ page, base }) => {

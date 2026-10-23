@@ -245,7 +245,7 @@
   "Loading tree…": "正在加载文档结构…",
   "Loading versions…": "正在加载版本列表…",
   "Loading version…": "正在加载版本…",
-  "Locating source; updating PDF if needed...": "正在定位源码，必要时更新 PDF…",
+  "Locating source in PDF...": "正在 PDF 中定位源码…",
   "Log": "日志",
   "Auto-detect": "自动识别",
   "No LaTeX document found.": "未找到 LaTeX 文档。",

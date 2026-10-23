@@ -32,6 +32,6 @@ export type ProjectMember = { username: string; displayName: string; role: strin
 export type BuildInfo = { log: string; main?: string; target?: import("../shared/compile-directives.ts").CompileTarget; status?: string; pdf?: boolean; errors?: Array<{ path: string; line: number; message: string }>; stale?: boolean; sourceRevision?: string | null };
 export type ProjectDetail = ProjectSummary & { main: string; files: ProjectFile[]; folders: string[]; settings: EditorSettings; build: BuildInfo; permissions?: { manage?: boolean; edit?: boolean; collaborate?: boolean } };
 export type SourcePosition = { path: string; line: number; from?: number; to?: number; stale?: boolean };
-export type PdfPosition = { page: number; x: number; y: number; revision: string; boxes?: PdfBox[] };
+export type PdfPosition = { page: number; x: number; y: number; revision: string; boxes?: PdfBox[]; stale?: boolean };
 export type ReplacementPreview = { path: string; baseSha256: string; before: string; source: string };
 export type SearchMatch = { path: string; line: number; from: number; to: number; text: string };

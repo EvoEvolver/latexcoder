@@ -386,6 +386,28 @@ test(`${platform} real SyncTeX PDF modifier-click opens included source and foll
       const view = globalThis.__paperE2E.state.view;
       return view.state.doc.lineAt(view.state.selection.main.head).text.includes("Unique source");
     });
+    // A failed compile must not block displaying or navigating the old PDF,
+    // including after a reload with no in-memory preview.
+    const broken = "% inserted above\n" + child + "\\thisCommandDoesNotExist\n";
+    await page.request.put(`${base}/v1/files?project=${id}&path=chapters/intro.tex`, { data: broken, headers: { "Content-Type": "text/plain" } });
+    const failed = await page.request.post(`${base}/v1/compile?project=${id}`, { data: {} });
+    assert.equal(failed.status(), 422, await failed.text());
+    const failedBuild = (await failed.json()).build;
+    assert.equal(failedBuild.sourceRevision, revision);
+    await page.reload();
+    await page.waitForFunction(() => globalThis.__paperE2E?.state.provider?.synced);
+    await page.locator("#pdf-document canvas").waitFor({ state: "attached" });
+    await selectionContextMenu(page, "Unique source", false);
+    const stalePositionResponse = page.waitForResponse(response => response.url().includes("/v1/build/position"));
+    await page.locator('[data-editor-action="pdf"]').click();
+    const stalePosition = await stalePositionResponse;
+    assert.equal(stalePosition.status(), 200, await stalePosition.text());
+    assert.equal((await stalePosition.json()).stale, true);
+    assert.equal((await stalePosition.json()).revision, revision);
+    await page.locator("#pdf-source-marker").waitFor();
+    await page.locator("#pdf-freshness").waitFor();
+    const unchangedBuild = (await (await page.request.get(`${base}/v1/build?project=${id}`)).json()).build;
+    assert.equal(unchangedBuild.finishedAt, failedBuild.finishedAt, "navigation does not retry the failed compile");
   }, { compiler: realLatexmk });
 });
 }

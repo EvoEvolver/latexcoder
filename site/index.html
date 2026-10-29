@@ -3,157 +3,225 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="LaTeX Coder is a self-hosted writing workspace where people, coding agents, and Git collaborate on the same paper.">
-    <meta property="og:title" content="LaTeX Coder">
-    <meta property="og:description" content="Write together. Own the source.">
-    <meta property="og:image" content="https://evoevolver.github.io/LatexCoder/assets/workspace.png">
+    <title>LaTeX Coder — Not another Overleaf. A better one.</title>
+    <meta name="description" content="LaTeX Coder is an open-source, self-hosted LaTeX editor for research teams: real-time collaboration, free track changes, a real Git repository behind every paper, and a safe editing path for AI coding agents.">
+    <meta property="og:title" content="LaTeX Coder — Not another Overleaf. A better one.">
+    <meta property="og:description" content="Open-source collaborative LaTeX with free track changes, native Git, and first-class AI agent editing. Deploy in one click.">
+    <meta property="og:image" content="https://evoevolver.github.io/LatexCoder/assets/og.png">
     <meta property="og:type" content="website">
-    <meta name="theme-color" content="#f4f6f1">
-    <title>LaTeX Coder - Write together. Own the source.</title>
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="theme-color" content="#f5f3ee">
     <link rel="icon" href="assets/l-keycap.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
     <header class="site-header">
       <a class="brand" href="#top" aria-label="LaTeX Coder home">
-        <img src="assets/l-keycap.svg" width="34" height="34" alt="">
+        <img src="assets/l-keycap.svg" width="30" height="30" alt="">
         <span>LaTeX Coder</span>
       </a>
       <nav aria-label="Primary navigation">
-        <a href="#demos">Demos</a>
-        <a href="#workflow">Workflow</a>
-        <a href="https://github.com/EvoEvolver/LatexCoder">GitHub</a>
+        <a href="#why">Why switch</a>
+        <a href="#agents">Agents</a>
+        <a href="#features">Features</a>
+        <a href="#compare">Compare</a>
+        <a href="#deploy">Deploy</a>
       </nav>
-      <a class="header-action" href="https://railway.com/deploy/latexcoder?referralCode=4KUZ4o&amp;utm_medium=integration&amp;utm_source=template&amp;utm_campaign=generic">Deploy <span aria-hidden="true">↗</span></a>
+      <a class="header-action" href="https://github.com/EvoEvolver/LatexCoder">
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        Star on GitHub
+      </a>
     </header>
 
     <main id="top">
       <section class="hero">
-        <div class="hero-copy">
-          <p class="eyebrow">MIT licensed · Self-hosted · Agent-ready</p>
-          <h1>LaTeX Coder</h1>
-          <p class="lede">A professional writing workspace where people, coding agents, and Git work on the same paper without giving up ordinary files.</p>
-          <div class="hero-actions">
-            <a class="button primary" href="https://railway.com/deploy/latexcoder?referralCode=4KUZ4o&amp;utm_medium=integration&amp;utm_source=template&amp;utm_campaign=generic">Deploy your own</a>
-            <a class="button secondary" href="https://github.com/EvoEvolver/LatexCoder">View source</a>
-          </div>
+        <p class="pill"><span class="dot"></span>Open source · MIT · Self-hosted</p>
+        <h1>Not another Overleaf.<br><em>A better one.</em></h1>
+        <p class="lede">The collaborative LaTeX editor built for how papers are written now — with your coauthors, your AI coding agents, and Git, all on the same source.</p>
+        <div class="actions">
+          <a class="button primary" href="https://railway.com/deploy/latexcoder?referralCode=4KUZ4o&amp;utm_medium=integration&amp;utm_source=template&amp;utm_campaign=generic">Deploy in one click <span aria-hidden="true">→</span></a>
+          <a class="button ghost" href="https://github.com/EvoEvolver/LatexCoder">View on GitHub</a>
         </div>
-        <figure class="product-shot">
-          <img src="assets/workspace.png" alt="LaTeX Coder workspace with a project tree, source editor, and PDF preview" width="1440" height="810">
+        <ul class="hero-facts" aria-label="Highlights">
+          <li>Track changes, free</li>
+          <li>Every paper is a Git repo</li>
+          <li>Agents edit safely</li>
+          <li>Guests need no account</li>
+        </ul>
+        <figure class="window hero-shot">
+          <div class="window-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+          <img src="assets/shot-workspace.webp" width="2000" height="1250" alt="LaTeX Coder workspace with file tree, LaTeX source, tracked suggestions, and PDF preview">
         </figure>
       </section>
 
-      <section class="statement" aria-label="Product principles">
-        <p>Write live with your team.</p>
-        <p>Hand precise work to agents.</p>
-        <p>Keep every change in Git.</p>
-      </section>
-
-      <section class="demo-section" id="demos">
-        <div class="section-heading">
-          <p class="eyebrow">The writing surface</p>
-          <h2>Built for the paper, not the browser tab.</h2>
-          <p>Files, source, PDF, comments, logs, and version history stay close enough to move through without losing context.</p>
+      <section class="why" id="why">
+        <div class="section-head">
+          <p class="kicker">Why switch</p>
+          <h2>The parts you pay extra for,<br><em>built in and yours.</em></h2>
         </div>
-
-        <article class="demo-row">
-          <div class="demo-copy">
-            <span class="demo-number">01</span>
-            <h3>Source and PDF, side by side</h3>
-            <p>Resize the workspace, navigate included files, and move between source and the compiled paper with SyncTeX.</p>
-            <ul>
-              <li>Project-wide file tree and tabs</li>
-              <li>Bidirectional source/PDF navigation</li>
-              <li>First-fatal-error Log workflow</li>
-            </ul>
-          </div>
-          <figure class="demo-media"><img src="assets/demo-workspace.gif" loading="lazy" alt="Opening a project and working with source and PDF side by side"></figure>
-        </article>
-
-        <article class="demo-row reverse">
-          <div class="demo-copy">
-            <span class="demo-number">02</span>
-            <h3>Review data agents can actually read</h3>
-            <p>Comments, replies, and suggestions are stored as macros in the source instead of disappearing into an opaque review database.</p>
-            <ul>
-              <li>Inline comments and threaded replies</li>
-              <li>Project-wide Review view</li>
-              <li>Character-level blame and Git provenance</li>
-            </ul>
-          </div>
-          <figure class="demo-media"><img src="assets/demo-review.gif" loading="lazy" alt="Reviewing inline comments and character-level authorship"></figure>
-        </article>
-
-        <article class="demo-row">
-          <div class="demo-copy">
-            <span class="demo-number">03</span>
-            <h3>See who wrote every range</h3>
-            <p>Turn on Blame to inspect continuous authorship directly in the editor, then follow a range back to the Git checkpoint that introduced it.</p>
-            <ul>
-              <li>Character-level attribution</li>
-              <li>Human, agent, and Git identity hints</li>
-              <li>Linked version history and word-level diffs</li>
-            </ul>
-          </div>
-          <figure class="demo-media"><img src="assets/demo-blame.gif" loading="lazy" alt="Character-level blame showing who wrote each continuous source range"></figure>
-        </article>
-
-        <article class="demo-row reverse">
-          <div class="demo-copy">
-            <span class="demo-number">04</span>
-            <h3>Understand before you jump</h3>
-            <p>Hover over citations, formulas, references, and graphics to inspect what they mean without leaving the sentence you are writing.</p>
-            <ul>
-              <li>Citation metadata with authors and title</li>
-              <li>KaTeX previews with custom macro expansion</li>
-              <li>Referenced image and PDF previews</li>
-            </ul>
-          </div>
-          <figure class="demo-media"><img src="assets/demo-hover.gif" loading="lazy" alt="Hover previews for citations, formulas, and project graphics"></figure>
-        </article>
-
-        <article class="demo-row">
-          <div class="demo-copy">
-            <span class="demo-number">05</span>
-            <h3>Git without a second source of truth</h3>
-            <p>Every project is a real repository. Live Yjs state stays on main, pulls checkpoint current browser edits, and incoming work is merged before import.</p>
-            <ul>
-              <li>Personal clone and push URLs</li>
-              <li>Recoverable conflict branches</li>
-              <li>Checked full-file editing API for agents</li>
-            </ul>
-          </div>
-          <figure class="demo-media"><img src="assets/demo-git.gif" loading="lazy" alt="Opening Git access for a live LaTeX Coder project"></figure>
-        </article>
-      </section>
-
-      <section class="workflow" id="workflow">
-        <div class="section-heading">
-          <p class="eyebrow">One paper, three interfaces</p>
-          <h2>No export ritual between collaborators.</h2>
-        </div>
-        <div class="workflow-grid">
-          <article><span>Human</span><h3>Edit live</h3><p>Use the full editor, PDF, review, history, blame, and project navigation.</p></article>
-          <article><span>Agent</span><h3>Patch safely</h3><p>Download a file, return a checked replacement, and fail cleanly if the base changed.</p></article>
-          <article><span>Git</span><h3>Clone normally</h3><p>Pull live checkpoints and push commits back through the same project history.</p></article>
+        <div class="swap-grid">
+          <article>
+            <p class="was">Track changes behind a paywall</p>
+            <h3>Comments &amp; suggestions for everyone</h3>
+            <p>Inline comments, threaded replies, accept/reject suggestions — stored as LaTeX macros in the source, so they survive Git, ZIP exports, and agents.</p>
+          </article>
+          <article>
+            <p class="was">A Git bridge that flattens history</p>
+            <h3>A real Git repository per paper</h3>
+            <p>Clone over SSH, push from your laptop, and pull live browser edits. Conflicts land on their own branch instead of in your draft.</p>
+          </article>
+          <article>
+            <p class="was">Copy-pasting into a chat window</p>
+            <h3>AI agents as real collaborators</h3>
+            <p>Hand Claude Code, Codex, or any shell agent one command. It edits the live paper — and can be limited to reviewable suggestions.</p>
+          </article>
+          <article>
+            <p class="was">Collaborator limits and sign-up walls</p>
+            <h3>Share a link, start writing</h3>
+            <p>View and edit links work for guests without an account. Invite your whole lab — there is no seat count.</p>
+          </article>
+          <article>
+            <p class="was">Your unpublished work on someone else’s cloud</p>
+            <h3>Your server, your data</h3>
+            <p>Papers are plain files and Git repositories on your own volume. Backups are a file copy. Leaving is a <code>git clone</code>.</p>
+          </article>
+          <article>
+            <p class="was">Compile limits on the free tier</p>
+            <h3>Full TeX Live, your hardware</h3>
+            <p>pdfLaTeX, XeLaTeX, LuaLaTeX, biber, and Tectonic — on a machine you choose, with chapter-level builds for long theses.</p>
+          </article>
         </div>
       </section>
 
-      <section class="closing">
-        <img src="assets/l-keycap.svg" width="84" height="84" alt="">
-        <p class="eyebrow">MIT licensed</p>
-        <h2>Write together.<br>Own the source.</h2>
-        <div class="hero-actions">
-          <a class="button primary" href="https://railway.com/deploy/latexcoder?referralCode=4KUZ4o&amp;utm_medium=integration&amp;utm_source=template&amp;utm_campaign=generic">Deploy on Railway</a>
-          <a class="button secondary" href="https://github.com/EvoEvolver/LatexCoder">Read the documentation</a>
+      <section class="agents" id="agents">
+        <div class="agents-inner">
+          <div class="agents-copy">
+            <p class="kicker light">Built for the agent era</p>
+            <h2>Let your coding agent<br><em>write in the paper.</em></h2>
+            <p>Copy one command from the Collaborate menu. Your agent gets a plain-text manual for this project — files, search, compile, review, Git — and edits through a checked protocol that never overwrites a coauthor.</p>
+            <ol class="steps">
+              <li><b>Download</b> the file it wants to change.</li>
+              <li><b>Edit</b> with ordinary local tools.</li>
+              <li><b>Upload</b> with the original hash. If someone edited meanwhile, the upload is rejected — not merged blindly.</li>
+            </ol>
+            <p class="note">Switch to <b>Propose</b> mode and every agent change arrives as a tracked suggestion you accept or reject.</p>
+          </div>
+          <div class="terminal" aria-label="Example agent session">
+            <div class="terminal-bar"><i></i><i></i><i></i><span>~/paper</span></div>
+<pre><code><span class="prompt">$</span> claude "Tighten the abstract and fix the
+  citation style in our LaTeX Coder paper"
+
+<span class="dim">● Reading project manual…</span>
+<span class="dim">● GET  /files/main.tex</span>          <span class="ok">200</span>
+<span class="dim">● Compile → 0 errors, 4 pages</span>
+<span class="dim">● PUT  /files/main.tex  base=9f3c…</span>
+  <span class="warn">409 base changed</span> <span class="dim">— Maya is editing</span>
+<span class="dim">● Re-read, re-applied edit</span>
+<span class="dim">● PUT  /files/main.tex  base=a71e…</span> <span class="ok">200</span>
+
+<span class="ok">✓</span> 2 suggestions added for review</code></pre>
+          </div>
         </div>
+      </section>
+
+      <section class="features" id="features">
+        <div class="section-head">
+          <p class="kicker">The writing surface</p>
+          <h2>Small things that add up<br><em>to hours every week.</em></h2>
+        </div>
+
+        <article class="feature">
+          <div class="feature-copy">
+            <span class="num">01</span>
+            <h3>Hover to see it. Click to go there.</h3>
+            <p>Hover a <code>\ref</code> to see the equation or figure it points to — even from another file. Hover a citation for its title and authors. ⌘-click jumps to the label, the BibTeX entry, or the included file.</p>
+          </div>
+          <figure class="window"><div class="window-bar" aria-hidden="true"><i></i><i></i><i></i></div><img src="assets/shot-hover-eqref.webp" loading="lazy" width="2000" height="1250" alt="Hovering an equation reference previews the rendered equation from another file"></figure>
+        </article>
+
+        <article class="feature reverse">
+          <div class="feature-copy">
+            <span class="num">02</span>
+            <h3>Review that lives in the source.</h3>
+            <p>Comments and suggestions are LaTeX macros, not rows in a hidden database. Humans, agents, and <code>git diff</code> all see the same review. Resolved threads keep their history.</p>
+          </div>
+          <figure class="window"><div class="window-bar" aria-hidden="true"><i></i><i></i><i></i></div><img src="assets/shot-review.webp" loading="lazy" width="2000" height="1250" alt="Review panel with a comment thread and a tracked suggestion"></figure>
+        </article>
+
+        <article class="feature">
+          <div class="feature-copy">
+            <span class="num">03</span>
+            <h3>Know who wrote every character.</h3>
+            <p>Blame mode shows authorship right in the editor — person, agent, or Git commit — and links each range to the checkpoint that introduced it.</p>
+          </div>
+          <figure class="window"><div class="window-bar" aria-hidden="true"><i></i><i></i><i></i></div><img src="assets/demo-blame.gif" loading="lazy" alt="Character-level blame showing who wrote each range"></figure>
+        </article>
+
+        <article class="feature reverse">
+          <div class="feature-copy">
+            <span class="num">04</span>
+            <h3>Git without a second source of truth.</h3>
+            <p>The live document <em>is</em> <code>main</code>. Browser edits are checkpointed automatically, so a <code>git pull</code> always sees the latest text, and pushes merge straight into what your coauthors are typing.</p>
+          </div>
+          <figure class="window"><div class="window-bar" aria-hidden="true"><i></i><i></i><i></i></div><img src="assets/shot-git.webp" loading="lazy" width="2000" height="1250" alt="Git access dialog with SSH clone command"></figure>
+        </article>
+
+        <ul class="mini-grid" aria-label="More features">
+          <li><b>SyncTeX</b> both ways — source to PDF and back.</li>
+          <li><b>Chapter builds</b> compile just the chapter you are on.</li>
+          <li><b>Readable logs</b> that jump to the first fatal error.</li>
+          <li><b>Citation autocomplete</b> with titles and authors.</li>
+          <li><b>Project search</b> with regex and previewed replace.</li>
+          <li><b>History</b> with per-file diffs and one-click restore.</li>
+          <li><b>Markdown</b> notes beside LaTeX, with live preview.</li>
+          <li><b>English, 中文, 日本語</b> interface.</li>
+        </ul>
+      </section>
+
+      <section class="compare" id="compare">
+        <div class="section-head">
+          <p class="kicker">Side by side</p>
+          <h2>LaTeX Coder vs. Overleaf</h2>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th></th><th>LaTeX Coder</th><th>Overleaf</th></tr></thead>
+            <tbody>
+              <tr><th>Price</th><td>Free, MIT licensed</td><td>Free tier; key features on paid plans</td></tr>
+              <tr><th>Track changes</th><td><span class="yes">Included</span></td><td>Premium feature</td></tr>
+              <tr><th>Git</th><td><span class="yes">Real repo per project</span>, SSH, merge on push</td><td>Git Bridge on paid plans, one linear branch</td></tr>
+              <tr><th>Reviews + Git</th><td><span class="yes">Review data travels with the source</span></td><td>Pushing can displace comments and tracked changes</td></tr>
+              <tr><th>AI agents</th><td><span class="yes">Checked edit API</span>, propose-only mode</td><td>No checked edit API for external agents</td></tr>
+              <tr><th>Guests</th><td><span class="yes">Link access, no account</span></td><td>Account-based, collaborator limits by plan</td></tr>
+              <tr><th>Hosting</th><td>Your server or one-click Railway</td><td>Overleaf cloud, or separate on-prem products</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="fine">Based on Overleaf’s public documentation for <a href="https://docs.overleaf.com/getting-started/free-and-premium-plans/premium-features">plans</a>, <a href="https://docs.overleaf.com/collaborating/track-changes">track changes</a>, and <a href="https://docs.overleaf.com/integrations-and-add-ons/git-integration-and-github-synchronization/git-integration/advanced-git-operations">Git</a>.</p>
+      </section>
+
+      <section class="deploy" id="deploy">
+        <img src="assets/l-keycap.svg" width="76" height="76" alt="">
+        <h2>Your lab’s own LaTeX editor,<br><em>five minutes from now.</em></h2>
+        <p class="lede">One click on Railway, or Docker on any server. Full TeX Live installs itself on first start.</p>
+        <div class="actions">
+          <a class="button primary" href="https://railway.com/deploy/latexcoder?referralCode=4KUZ4o&amp;utm_medium=integration&amp;utm_source=template&amp;utm_campaign=generic">Deploy on Railway <span aria-hidden="true">→</span></a>
+          <a class="button ghost" href="https://github.com/EvoEvolver/LatexCoder#deploy-with-docker-or-railway">Self-host with Docker</a>
+        </div>
+<pre class="snippet"><code>git clone https://github.com/EvoEvolver/LatexCoder && cd LatexCoder
+docker build -t latexcoder .
+docker run -p 8090:8080 -v latexcoder-data:/data \
+  -e LATEXCODER_ADMIN_PASSWORD=… latexcoder</code></pre>
       </section>
     </main>
 
     <footer>
-      <span>LaTeX Coder</span>
-      <span>Built for collaborative scientific writing.</span>
-      <a href="https://github.com/EvoEvolver/LatexCoder/blob/main/LICENSE">MIT License</a>
+      <span class="brand small"><img src="assets/l-keycap.svg" width="20" height="20" alt=""> LaTeX Coder</span>
+      <span>Write together. Own the source.</span>
+      <span class="links"><a href="https://github.com/EvoEvolver/LatexCoder">GitHub</a><a href="https://github.com/EvoEvolver/biblock">Biblock</a><a href="https://github.com/EvoEvolver/LatexCoder/blob/main/LICENSE">MIT License</a></span>
     </footer>
   </body>
 </html>

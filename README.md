@@ -1,31 +1,64 @@
 <p align="center">
-  <img src="docs/images/l-keycap.svg" width="112" alt="LaTeX Coder L keycap logo">
+  <img src="docs/images/l-keycap.svg" width="96" alt="LaTeX Coder L keycap logo">
 </p>
 
-<h1 align="center">LaTeX Coder</h1>
+<h1 align="center">Not another Overleaf.<br><em>A better one.</em></h1>
 
-<p align="center"><strong>A self-hosted LaTeX workspace where people, coding agents, and Git work on the same paper.</strong></p>
+<p align="center"><strong>LaTeX Coder</strong> is the open-source collaborative LaTeX editor built for how papers are written now:<br>with your coauthors, your AI coding agents, and Git, all on the same source.</p>
 
 <p align="center">
   <a href="https://evoevolver.github.io/LatexCoder/">Website</a> ·
-  <a href="https://github.com/EvoEvolver/LatexCoder#quick-start">Documentation</a>
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#latex-coder-vs-overleaf">Compare with Overleaf</a> ·
+  <a href="README.zh-CN.md">中文</a>
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-0b6e4f"></a>
+  <a href="https://github.com/EvoEvolver/LatexCoder/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/EvoEvolver/LatexCoder?style=flat&color=0b6e4f"></a>
+  <img alt="Self-hosted" src="https://img.shields.io/badge/self--hosted-Docker%20%7C%20Railway-121512">
+  <img alt="Interface languages" src="https://img.shields.io/badge/UI-English%20%7C%20中文%20%7C%20日本語-121512">
 </p>
 
 <p align="center">
   <a href="https://railway.com/deploy/latexcoder?referralCode=4KUZ4o&amp;utm_medium=integration&amp;utm_source=template&amp;utm_campaign=generic"><img src="https://railway.com/button.svg" alt="Deploy on Railway"></a>
 </p>
 
-LaTeX Coder combines real-time collaborative editing, integrated LaTeX
-compilation, and a first-class editing path for coding agents. Your paper
-stays ordinary files on disk, and every project is a real Git repository you
-can clone, push to, and back up like any other directory.
+![LaTeX Coder workspace with file tree, LaTeX source, tracked suggestions, and PDF preview](docs/images/hero.webp)
 
-![LaTeX Coder workspace with files, source editing, and PDF preview](docs/images/workspace.png)
+## Why teams switch
+
+|  | Elsewhere | LaTeX Coder |
+| --- | --- | --- |
+| **Track changes** | Often a paid feature | Comments, replies, and suggestions for everyone, stored in the source |
+| **Git** | A paid bridge with flattened history | Every paper *is* a Git repository: SSH clone, push, merge, restore |
+| **AI agents** | Copy-paste into a chat window | Hand Claude Code, Codex, or any shell agent one command; it edits the live paper safely |
+| **Collaborators** | Accounts and seat limits | View/Edit links for guests, no account, no seat count |
+| **Your data** | Someone else's cloud | Plain files and Git repos on your own volume |
+| **Compilation** | Time limits on free tiers | Full TeX Live (pdfLaTeX, XeLaTeX, LuaLaTeX) and Tectonic on your hardware |
+
+## Let your coding agent write in the paper
+
+Copy the project's **Agent editing** command from the Collaborate menu and
+give it to your agent. The agent receives a plain-text manual for this
+project — files, search, compilation, blame, reviews, and Git — and edits
+through a deliberately simple, checked protocol:
+
+1. Download a file.
+2. Edit it with ordinary local tools.
+3. Upload the replacement together with the original content hash.
+
+The server applies the change in one transaction. If a collaborator edited
+the file in the meantime, the upload is rejected instead of overwriting their
+work. Switch the agent to **Propose** and every change arrives as a tracked
+suggestion you accept or reject.
 
 > Working with BibTeX? See [Biblock](https://github.com/EvoEvolver/biblock), an
 > auditable bibliography workflow for humans and agents.
 
-## Why LaTeX Coder
+## Features
+
+### Write faster
 
 - **Hover to preview images and equations.** See a figure or rendered equation
   by hovering over its reference, even when it is defined in another file.
@@ -37,6 +70,8 @@ can clone, push to, and back up like any other directory.
   (`\cite`, `\citep`, `\citet`, `\ref`, `\eqref`, `\autoref`, `\cref`).
   `\input`, `\include`, `\includegraphics`, and `\url` open their targets too.
 
+![Hovering an equation reference previews the equation defined in another file](docs/images/hover.webp)
+
 ### Write together
 
 - Edit simultaneously with live cursors and presence.
@@ -46,6 +81,8 @@ can clone, push to, and back up like any other directory.
   them too. Paragraph replacements retain their threads; removed anchors stay
   in **Detached comments**. **Resolve** preserves the discussion under **Resolved**,
   with **Reopen** available when its original text can be uniquely located.
+
+![Review panel with a comment thread and a tracked suggestion](docs/images/review.webp)
 
 ### Navigate the paper, not just its files
 
@@ -71,34 +108,16 @@ can clone, push to, and back up like any other directory.
 - The last successful PDF stays on screen while you edit and is only flagged
   when it goes stale.
 
-### Give agents a first-class editing path
-
-Every collaborator can copy a project-specific **Agent editing** command from
-the Collaborate menu. It hands the agent a plain-text manual containing the
-project's files and its API URLs.
-
-The edit workflow is deliberately simple:
-
-1. Download a file.
-2. Edit it with ordinary local tools.
-3. Upload the replacement together with the original content hash.
-
-The server applies the changes in one transaction; if a collaborator edited
-the file in the meantime, the upload is rejected instead of overwriting their
-work. Agent access can also be restricted so every edit arrives as a
-reviewable suggestion. The same manual covers project search, compilation,
-blame, reviews, and Git.
-
 <p align="center">
   <img src="docs/images/mobile-source-pdf.png" width="1000" alt="LaTeX Coder mobile source and PDF views side by side">
 </p>
 
 ## LaTeX Coder vs. Overleaf
 
-For teams considering an alternative to Overleaf, start with the
-[editor features above](#why-latex-coder). LaTeX Coder also gives teams control
-of their infrastructure and makes coding agents part of the writing workflow.
-The table below compares collaboration and integration choices.
+LaTeX Coder is not a clone of Overleaf. It keeps what makes browser LaTeX
+pleasant — live co-editing, instant PDF, no local setup — and rebuilds the
+parts that matter for research teams today: ownership of the source, Git as a
+first-class citizen, and agents as collaborators.
 
 | | LaTeX Coder | Overleaf |
 | --- | --- | --- |

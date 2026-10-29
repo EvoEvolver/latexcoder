@@ -18,11 +18,15 @@
 
 ![LaTeX Coder 中文界面：文件树、源码、修订建议和 PDF 预览](marketing/shots/zh-CN/workspace.png)
 
+## 这个项目是怎么来的
+
+我们一开始只是想复刻一个 Overleaf，部署在课题组自己的服务器上用。做到一半发现，Overleaf 的坑实在太多，复刻它就等于把这些坑一起复刻过来。于是我们不再照抄，而是一个个把坑填平，最后做成了一个 Overleaf 超级加强版。
+
 ## 为什么换
 
 | | 别处 | LaTeX Coder |
 | --- | --- | --- |
-| **修订 / 批注** | 往往是付费功能 | 人人可用，审阅记录以 LaTeX 宏的形式存在源码里 |
+| **修订 / 批注** | 存在平台数据库里，Git 推送可能冲掉 | 以 LaTeX 宏的形式存在源码里，Git、导出、AI 都保得住 |
 | **Git** | 付费桥接，历史被压成一条线 | 每篇论文本身就是 Git 仓库：SSH 克隆、推送、合并、回滚 |
 | **AI 改稿** | 复制到聊天框再粘回来 | 把一条命令交给 Claude Code、Codex 等智能体，直接安全地改实时论文 |
 | **协作者** | 需要账号，人数受套餐限制 | 查看 / 编辑链接，访客免注册，不限人数 |
@@ -78,6 +82,10 @@ LATEXCODER_ADMIN_PASSWORD='use-a-long-random-password' pnpm start
 中文论文（`ctex`）需要 XeLaTeX：编译器选 latexmk 时，在项目根目录放一个 `latexmkrc`，写入 `$pdflatex = 'xelatex %O %S';` 即可。Tectonic 本身基于 XeTeX 引擎。
 
 部署、Git、编译、配置项和安全模型的完整说明见 [英文 README](README.md)。
+
+## 提功能需求
+
+写论文时你最想要、但 Overleaf 一直没做的功能是什么？欢迎[提 Issue](https://github.com/EvoEvolver/LatexCoder/issues/new) 告诉我们，呼声高的功能我们优先做。
 
 ## 许可证
 

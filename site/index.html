@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LaTeX Coder — Not another Overleaf. A better one.</title>
-    <meta name="description" content="LaTeX Coder is an open-source, self-hosted LaTeX editor for research teams: real-time collaboration, free track changes, a real Git repository behind every paper, and a safe editing path for AI coding agents.">
+    <meta name="description" content="LaTeX Coder is an open-source, self-hosted LaTeX editor for research teams: real-time collaboration, review that lives in the source, a real Git repository behind every paper, and a safe editing path for AI coding agents.">
     <meta property="og:title" content="LaTeX Coder — Not another Overleaf. A better one.">
-    <meta property="og:description" content="Open-source collaborative LaTeX with free track changes, native Git, and first-class AI agent editing. Deploy in one click.">
+    <meta property="og:description" content="We set out to clone Overleaf and ended up building the upgrade: open-source collaborative LaTeX with native Git and first-class AI agent editing. Deploy in one click.">
     <meta property="og:image" content="https://evoevolver.github.io/LatexCoder/assets/og.png">
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary_large_image">
@@ -46,7 +46,7 @@
           <a class="button ghost" href="https://github.com/EvoEvolver/LatexCoder">View on GitHub</a>
         </div>
         <ul class="hero-facts" aria-label="Highlights">
-          <li>Track changes, free</li>
+          <li>Review lives in the source</li>
           <li>Every paper is a Git repo</li>
           <li>Agents edit safely</li>
           <li>Guests need no account</li>
@@ -59,13 +59,14 @@
 
       <section class="why" id="why">
         <div class="section-head">
-          <p class="kicker">Why switch</p>
-          <h2>The parts you pay extra for,<br><em>built in and yours.</em></h2>
+          <p class="kicker">How this started</p>
+          <h2>We set out to clone Overleaf.<br><em>Then we kept fixing it.</em></h2>
+          <p>Cloning it meant cloning everything that gets in a research team’s way. So we rebuilt those parts instead — and ended up with something much stronger.</p>
         </div>
         <div class="swap-grid">
           <article>
-            <p class="was">Track changes behind a paywall</p>
-            <h3>Comments &amp; suggestions for everyone</h3>
+            <p class="was">Review that a Git push can wipe out</p>
+            <h3>Comments &amp; suggestions in the source</h3>
             <p>Inline comments, threaded replies, accept/reject suggestions — stored as LaTeX macros in the source, so they survive Git, ZIP exports, and agents.</p>
           </article>
           <article>
@@ -191,7 +192,6 @@
             <thead><tr><th></th><th>LaTeX Coder</th><th>Overleaf</th></tr></thead>
             <tbody>
               <tr><th>Price</th><td>Free, MIT licensed</td><td>Free tier; key features on paid plans</td></tr>
-              <tr><th>Track changes</th><td><span class="yes">Included</span></td><td>Premium feature</td></tr>
               <tr><th>Git</th><td><span class="yes">Real repo per project</span>, SSH, merge on push</td><td>Git Bridge on paid plans, one linear branch</td></tr>
               <tr><th>Reviews + Git</th><td><span class="yes">Review data travels with the source</span></td><td>Pushing can displace comments and tracked changes</td></tr>
               <tr><th>AI agents</th><td><span class="yes">Checked edit API</span>, propose-only mode</td><td>No checked edit API for external agents</td></tr>
@@ -200,7 +200,7 @@
             </tbody>
           </table>
         </div>
-        <p class="fine">Based on Overleaf’s public documentation for <a href="https://docs.overleaf.com/getting-started/free-and-premium-plans/premium-features">plans</a>, <a href="https://docs.overleaf.com/collaborating/track-changes">track changes</a>, and <a href="https://docs.overleaf.com/integrations-and-add-ons/git-integration-and-github-synchronization/git-integration/advanced-git-operations">Git</a>.</p>
+        <p class="fine">Based on Overleaf’s public documentation for <a href="https://docs.overleaf.com/getting-started/free-and-premium-plans/premium-features">plans</a> and <a href="https://docs.overleaf.com/integrations-and-add-ons/git-integration-and-github-synchronization/git-integration/advanced-git-operations">Git</a>.</p>
       </section>
 
       <section class="deploy" id="deploy">
@@ -215,6 +215,10 @@
 docker build -t latexcoder .
 docker run -p 8090:8080 -v latexcoder-data:/data \
   -e LATEXCODER_ADMIN_PASSWORD=… latexcoder</code></pre>
+        <div class="wish">
+          <p><b>What has Overleaf never built for you?</b> Tell us. The most requested features go to the top of our list.</p>
+          <a class="button ghost" href="https://github.com/EvoEvolver/LatexCoder/issues/new">Request a feature <span aria-hidden="true">→</span></a>
+        </div>
       </section>
     </main>
 

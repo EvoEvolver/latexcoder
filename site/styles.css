@@ -94,6 +94,7 @@ h1 em, h2 em { color: var(--green); }
 section { scroll-margin-top: 60px; }
 .section-head { width: min(860px, 100%); margin: 0 auto 64px; text-align: center; }
 .section-head h2, .agents h2, .deploy h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(40px, 5.4vw, 74px); line-height: 1.02; letter-spacing: -.02em; }
+.section-head h2 + p { width: min(640px, 100%); margin: 24px auto 0; color: var(--muted); font-size: 18px; line-height: 1.6; }
 .kicker { margin: 0 0 18px; font-family: var(--mono); font-size: 12px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--green); }
 .kicker.light { color: var(--green-glow); }
 
@@ -159,6 +160,11 @@ tbody td:last-child { color: var(--muted); }
 .snippet { display: inline-block; max-width: 100%; margin: 40px auto 0; padding: 18px 22px; overflow-x: auto; border-radius: 12px; background: var(--night); text-align: left; }
 .snippet code { padding: 0; background: none; color: #d8ded9; font-size: 13.5px; line-height: 1.7; }
 
+.wish { display: flex; align-items: center; justify-content: space-between; gap: 24px; width: min(760px, 100%); margin: 56px auto 0; padding: 22px 26px; border-radius: 16px; text-align: left; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.wish p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.55; }
+.wish b { color: var(--ink); font-weight: 600; }
+.wish .button { flex: none; height: 42px; font-size: 14px; }
+
 footer { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 26px 28px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
 .brand.small { font-size: 13px; color: var(--ink); }
 .links { display: flex; gap: 22px; }
@@ -183,6 +189,7 @@ footer { display: flex; justify-content: space-between; align-items: center; gap
   th, td { padding: 14px; font-size: 14px; }
   .terminal pre { font-size: 12px; padding: 18px; }
   footer { flex-direction: column; align-items: flex-start; padding-inline: 16px; }
+  .wish { flex-direction: column; align-items: flex-start; }
 }
 
 @media (prefers-reduced-motion: reduce) {

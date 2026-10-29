@@ -26,11 +26,18 @@
 
 ![LaTeX Coder workspace with file tree, LaTeX source, tracked suggestions, and PDF preview](docs/images/hero.webp)
 
+## How this started
+
+We set out to clone Overleaf so our lab could run it on our own server.
+Halfway through, it became clear that cloning Overleaf meant cloning
+everything that gets in a research team's way. So we stopped copying and
+started fixing, and ended up with a much stronger editor.
+
 ## Why teams switch
 
 |  | Elsewhere | LaTeX Coder |
 | --- | --- | --- |
-| **Track changes** | Often a paid feature | Comments, replies, and suggestions for everyone, stored in the source |
+| **Review** | Comments that a Git push can displace | Comments, replies, and suggestions stored in the source, so Git, exports, and agents keep them |
 | **Git** | A paid bridge with flattened history | Every paper *is* a Git repository: SSH clone, push, merge, restore |
 | **AI agents** | Copy-paste into a chat window | Hand Claude Code, Codex, or any shell agent one command; it edits the live paper safely |
 | **Collaborators** | Accounts and seat limits | View/Edit links for guests, no account, no seat count |
@@ -123,7 +130,7 @@ first-class citizen, and agents as collaborators.
 | --- | --- | --- |
 | Hosting | Self-hosted Node service; persistent data stays on your volume. | Hosted service, with separate on-premises products. |
 | Guest collaboration | View/Edit share links; an account is optional for project access. | Account-based collaboration with plan-dependent collaborator limits. |
-| Review data | Comments, replies, and suggestions are LaTeX macros visible to humans, agents, and Git. | Comments and Track Changes are platform-managed; Track Changes is a premium feature. |
+| Review data | Comments, replies, and suggestions are LaTeX macros visible to humans, agents, and Git. | Comments and Track Changes are platform-managed. |
 | Git model | Every project is a Git repository. The live documents represent `main`; incoming changes are merged before import. | Git Bridge translates Overleaf history into one linear branch named `master`; cloud Git integration is premium. |
 | Git and reviews | Macro-backed review state travels with source and is validated on import. | Overleaf advises against mixing active Git use with comments or Track Changes because pushes can displace or lose review metadata. |
 | Agent editing | Project-scoped plain-text manual, checked full-file edits, search, compilation, blame, review, and Git APIs. | General editor and integration workflows rather than this checked file-edit protocol. |
@@ -352,6 +359,11 @@ LATEXCODER_ADMIN_PASSWORD='1234567890' pnpm dev   # Vite on 5173 → app server 
 pnpm check                                        # build + typecheck
 pnpm test                                         # full test suite
 ```
+
+## Request a feature
+
+What has Overleaf never built for you? [Open an issue](https://github.com/EvoEvolver/LatexCoder/issues/new)
+and tell us. The most requested features go to the top of our list.
 
 ## License
 

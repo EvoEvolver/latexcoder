@@ -12,3 +12,6 @@ output/playwright/
 
 # Generated feature-tour videos stay local.
 /docs/videos/*.mp4
+
+# Marketing materials (screenshots, social cards, post copy) stay local.
+/marketing/

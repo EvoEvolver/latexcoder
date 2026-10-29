@@ -16,7 +16,7 @@
   <a href="https://railway.com/deploy/latexcoder?referralCode=4KUZ4o&amp;utm_medium=integration&amp;utm_source=template&amp;utm_campaign=generic"><img src="https://railway.com/button.svg" alt="一键部署到 Railway"></a>
 </p>
 
-![LaTeX Coder 中文界面：文件树、源码、修订建议和 PDF 预览](marketing/shots/zh-CN/workspace.png)
+![LaTeX Coder 中文界面：文件树、源码、修订建议和 PDF 预览](docs/images/hero-zh-CN.webp)
 
 ## 这个项目是怎么来的
 

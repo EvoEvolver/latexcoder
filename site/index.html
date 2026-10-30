@@ -10,222 +10,332 @@
     <meta property="og:image" content="https://evoevolver.github.io/LatexCoder/assets/og.png">
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="theme-color" content="#f5f3ee">
+    <meta name="theme-color" content="#0f3d2f">
     <link rel="icon" href="assets/l-keycap.svg" type="image/svg+xml">
+    <link rel="preload" href="assets/fonts/cmu-serif-700-roman.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="assets/fonts/cmu-serif-500-roman.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&display=swap">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
-    <header class="site-header">
+    <header class="desk-bar">
       <a class="brand" href="#top" aria-label="LaTeX Coder home">
         <img src="assets/l-keycap.svg" width="30" height="30" alt="">
         <span>LaTeX Coder</span>
       </a>
       <nav aria-label="Primary navigation">
-        <a href="#why">Why switch</a>
+        <a href="#story">Story</a>
         <a href="#agents">Agents</a>
         <a href="#features">Features</a>
         <a href="#compare">Compare</a>
         <a href="#deploy">Deploy</a>
       </nav>
-      <a class="header-action" href="https://github.com/EvoEvolver/LatexCoder">
+      <a class="desk-github" href="https://github.com/EvoEvolver/LatexCoder">
         <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
         Star on GitHub
       </a>
     </header>
 
     <main id="top">
-      <section class="hero">
-        <p class="pill"><span class="dot"></span>Open source · MIT · Self-hosted</p>
-        <h1>Not another Overleaf.<br><em>A better one.</em></h1>
-        <p class="lede">The collaborative LaTeX editor built for how papers are written now — with your coauthors, your AI coding agents, and Git, all on the same source.</p>
-        <div class="actions">
-          <a class="button primary" href="https://railway.com/deploy/latexcoder?referralCode=4KUZ4o&amp;utm_medium=integration&amp;utm_source=template&amp;utm_campaign=generic">Deploy in one click <span aria-hidden="true">→</span></a>
-          <a class="button ghost" href="https://github.com/EvoEvolver/LatexCoder">View on GitHub</a>
+      <!-- Page 1: title, abstract, figure 1 -->
+      <article class="sheet" aria-labelledby="title">
+        <p class="running-head" aria-hidden="true"><span>LaTeX Coder · galley proof</span><span>paper.tex · rev 0f3a9e1</span></p>
+
+        <header class="title-block">
+          <h1 id="title">Not another Overleaf.<br>A better one.</h1>
+          <p class="authors">You<sup>1</sup>, your coauthors<sup>2</sup>, and your coding agent<sup>3</sup></p>
+          <p class="affil"><sup>1</sup>On your lab’s own server &emsp; <sup>2</sup>Joined from a share link, no account &emsp; <sup>3</sup>Claude Code, Codex, or any shell agent</p>
+        </header>
+
+        <div class="block annotated">
+          <p class="abstract"><b>Abstract.</b> LaTeX Coder is an open-source <del class="mk red" id="m-clone0">Overleaf clone</del> collaborative LaTeX editor built for how papers are written now. Review lives <mark class="mk red" id="m-source">in the source</mark>, every paper is a real Git repository, and coding agents edit the live paper <ins class="mk blue" id="m-hash" data-ins="checked by content hash">without overwriting anyone</ins>. It runs on your server, free under the MIT license.</p>
+          <aside class="note red" data-for="m-clone0"><span class="who">Mei</span> not a clone. Stet the rest.</aside>
+          <aside class="note red" data-for="m-source"><span class="who">Xiao</span> so comments survive <i>git push</i>? ✓</aside>
+          <aside class="note blue" data-for="m-hash"><span class="who">claude-code</span> suggestion, accepted</aside>
         </div>
-        <ul class="hero-facts" aria-label="Highlights">
-          <li>Review lives in the source</li>
-          <li>Every paper is a Git repo</li>
-          <li>Agents edit safely</li>
-          <li>Guests need no account</li>
-        </ul>
-        <figure class="window hero-shot">
-          <div class="window-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+
+        <div class="block actions">
+          <a class="btn primary" href="https://railway.com/deploy/latexcoder?referralCode=4KUZ4o&amp;utm_medium=integration&amp;utm_source=template&amp;utm_campaign=generic">Deploy on Railway <span aria-hidden="true">→</span></a>
+          <a class="btn" href="https://github.com/EvoEvolver/LatexCoder">Star on GitHub</a>
+          <a class="aside-link" href="#deploy">or self-host with Docker</a>
+        </div>
+
+        <p class="block keywords"><b>Keywords</b> real-time collaboration · review in the source · a Git repository per paper · coding agents · guests without accounts · self-hosted</p>
+
+        <figure class="figure">
           <img src="assets/shot-workspace.webp" width="2000" height="1250" alt="LaTeX Coder workspace with file tree, LaTeX source, tracked suggestions, and PDF preview">
+          <figcaption><b>Figure 1.</b> The workspace: file tree, LaTeX source with tracked suggestions, and the PDF preview, side by side.</figcaption>
         </figure>
-      </section>
 
-      <section class="why" id="why">
-        <div class="section-head">
-          <p class="kicker">How this started</p>
-          <h2>We set out to clone Overleaf.<br><em>Then we kept fixing it.</em></h2>
-          <p>Cloning it meant cloning everything that gets in a research team’s way. So we rebuilt those parts instead — and ended up with something much stronger.</p>
-        </div>
-        <div class="swap-grid">
-          <article>
-            <p class="was">Review that a Git push can wipe out</p>
-            <h3>Comments &amp; suggestions in the source</h3>
-            <p>Inline comments, threaded replies, accept/reject suggestions — stored as LaTeX macros in the source, so they survive Git, ZIP exports, and agents.</p>
-          </article>
-          <article>
-            <p class="was">A Git bridge that flattens history</p>
-            <h3>A real Git repository per paper</h3>
-            <p>Clone over SSH, push from your laptop, and pull live browser edits. Conflicts land on their own branch instead of in your draft.</p>
-          </article>
-          <article>
-            <p class="was">Copy-pasting into a chat window</p>
-            <h3>AI agents as real collaborators</h3>
-            <p>Hand Claude Code, Codex, or any shell agent one command. It edits the live paper — and can be limited to reviewable suggestions.</p>
-          </article>
-          <article>
-            <p class="was">Collaborator limits and sign-up walls</p>
-            <h3>Share a link, start writing</h3>
-            <p>View and edit links work for guests without an account. Invite your whole lab — there is no seat count.</p>
-          </article>
-          <article>
-            <p class="was">Your unpublished work on someone else’s cloud</p>
-            <h3>Your server, your data</h3>
-            <p>Papers are plain files and Git repositories on your own volume. Backups are a file copy. Leaving is a <code>git clone</code>.</p>
-          </article>
-          <article>
-            <p class="was">Compile limits on the free tier</p>
-            <h3>Full TeX Live, your hardware</h3>
-            <p>pdfLaTeX, XeLaTeX, LuaLaTeX, biber, and Tectonic — on a machine you choose, with chapter-level builds for long theses.</p>
-          </article>
-        </div>
-      </section>
+        <p class="folio" aria-hidden="true"><span>Margin marks are illustrative.</span><span>1</span></p>
+      </article>
 
-      <section class="agents" id="agents">
-        <div class="agents-inner">
-          <div class="agents-copy">
-            <p class="kicker light">Built for the agent era</p>
-            <h2>Let your coding agent<br><em>write in the paper.</em></h2>
-            <p>Copy one command from the Collaborate menu. Your agent gets a plain-text manual for this project — files, search, compile, review, Git — and edits through a checked protocol that never overwrites a coauthor.</p>
-            <ol class="steps">
-              <li><b>Download</b> the file it wants to change.</li>
-              <li><b>Edit</b> with ordinary local tools.</li>
-              <li><b>Upload</b> with the original hash. If someone edited meanwhile, the upload is rejected — not merged blindly.</li>
+      <!-- Page 2: story and agents -->
+      <article class="sheet">
+        <p class="running-head" aria-hidden="true"><span>Not another Overleaf</span><span>§1–2</span></p>
+
+        <section id="story" class="section">
+          <h2><span class="secnum">1</span> How this started</h2>
+          <div class="block annotated">
+            <p class="lead-in">We set out to <del class="mk red" id="m-clone">clone</del> Overleaf.</p>
+            <aside class="note red" data-for="m-clone">→ <b>fix</b>. Cloning it meant cloning every pitfall.</aside>
+          </div>
+          <p class="block">We wanted our research group to have its own Overleaf, on its own server. Halfway through, it was clear that a faithful clone would also copy everything that gets in a research team’s way. So we stopped copying and started fixing, one pitfall at a time. Table 1 lists what changed.</p>
+
+          <div class="table-wrap">
+            <table class="booktabs">
+              <caption><b>Table 1.</b> What got in the way, and what we built instead.</caption>
+              <thead><tr><th scope="col">What got in the way</th><th scope="col">What LaTeX Coder does</th></tr></thead>
+              <tbody>
+                <tr><td data-label="What got in the way">Review that a Git push can wipe out</td><td data-label="What LaTeX Coder does">Comments and suggestions are LaTeX macros in the source; they survive Git, ZIP exports, and agents.</td></tr>
+                <tr><td data-label="What got in the way">A Git bridge that flattens history</td><td data-label="What LaTeX Coder does">A real Git repository per paper: clone over SSH, push, merge, restore. Conflicts land on their own branch.</td></tr>
+                <tr><td data-label="What got in the way">Copy-pasting into a chat window</td><td data-label="What LaTeX Coder does">Coding agents edit the live paper, and can be limited to reviewable suggestions.</td></tr>
+                <tr><td data-label="What got in the way">Collaborator limits and sign-up walls</td><td data-label="What LaTeX Coder does">View and edit links for guests, with no account and no seat count.</td></tr>
+                <tr><td data-label="What got in the way">Unpublished work on someone else’s cloud</td><td data-label="What LaTeX Coder does">Plain files and Git repositories on your own volume. Leaving is a <code>git clone</code>.</td></tr>
+                <tr><td data-label="What got in the way">Compile limits on the free tier</td><td data-label="What LaTeX Coder does">Full TeX Live and Tectonic on your hardware, with chapter-level builds for long theses.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="agents" class="section">
+          <h2><span class="secnum">2</span> Coding agents as coauthors</h2>
+          <p class="block">Copy one command from the Collaborate menu and hand it to Claude Code, Codex, or any shell agent. The agent receives a plain-text manual for this project — files, search, compilation, blame, review, and Git — and edits through a deliberately simple protocol.</p>
+
+          <div class="algorithm block" role="group" aria-labelledby="alg1">
+            <p class="alg-title" id="alg1"><b>Algorithm 1</b> Checked edit, as run by an agent</p>
+            <ol>
+              <li><b>download</b> <var>f</var>; &nbsp;<var>h</var> ← hash(<var>f</var>)</li>
+              <li><var>f′</var> ← edit(<var>f</var>) with ordinary local tools</li>
+              <li><b>upload</b> (<var>f′</var>, <var>h</var>)</li>
+              <li><b>if</b> the server’s hash of <var>f</var> ≠ <var>h</var> <b>then</b></li>
+              <li class="ind"><b>reject</b> — a coauthor edited meanwhile; re-read and retry</li>
+              <li><b>else</b> apply <var>f′</var> in one transaction</li>
             </ol>
-            <p class="note">Switch to <b>Propose</b> mode and every agent change arrives as a tracked suggestion you accept or reject.</p>
           </div>
-          <div class="terminal" aria-label="Example agent session">
-            <div class="terminal-bar"><i></i><i></i><i></i><span>~/paper</span></div>
-<pre><code><span class="prompt">$</span> claude "Tighten the abstract and fix the
-  citation style in our LaTeX Coder paper"
 
-<span class="dim">● Reading project manual…</span>
-<span class="dim">● GET  /files/main.tex</span>          <span class="ok">200</span>
-<span class="dim">● Compile → 0 errors, 4 pages</span>
-<span class="dim">● PUT  /files/main.tex  base=9f3c…</span>
-  <span class="warn">409 base changed</span> <span class="dim">— Maya is editing</span>
-<span class="dim">● Re-read, re-applied edit</span>
-<span class="dim">● PUT  /files/main.tex  base=a71e…</span> <span class="ok">200</span>
+          <figure class="listing block">
+<pre><code><span class="p">$</span> claude "Tighten the abstract in our LaTeX Coder paper"
+<span class="d">● GET  /files/main.tex</span>                     200
+<span class="d">● Compile → 0 errors, 4 pages</span>
+<span class="d">● PUT  /files/main.tex  base=9f3c…</span>
+  <span class="r">409 base changed</span> <span class="d">— Mei is editing</span>
+<span class="d">● Re-read, re-applied the edit</span>
+<span class="d">● PUT  /files/main.tex  base=a71e…</span>         200
+<span class="g">✓</span> 2 suggestions added for review</code></pre>
+            <figcaption><b>Listing 1.</b> An agent session in which a concurrent edit is detected rather than overwritten (illustrative).</figcaption>
+          </figure>
 
-<span class="ok">✓</span> 2 suggestions added for review</code></pre>
+          <div class="block annotated">
+            <p class="remark"><i>Remark.</i> Switch the agent to <b>Propose</b> and every change it makes arrives as a <mark class="mk blue" id="m-propose">tracked suggestion</mark> that you accept or reject, exactly like a coauthor’s.</p>
+            <aside class="note blue" data-for="m-propose"><span class="who">claude-code</span> 3 suggestions in §2.1, awaiting you</aside>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section class="features" id="features">
-        <div class="section-head">
-          <p class="kicker">The writing surface</p>
-          <h2>Small things that add up<br><em>to hours every week.</em></h2>
-        </div>
+        <p class="folio" aria-hidden="true"><span></span><span>2</span></p>
+      </article>
 
-        <article class="feature">
-          <div class="feature-copy">
-            <span class="num">01</span>
-            <h3>Hover to see it. Click to go there.</h3>
-            <p>Hover a <code>\ref</code> to see the equation or figure it points to — even from another file. Hover a citation for its title and authors. ⌘-click jumps to the label, the BibTeX entry, or the included file.</p>
+      <!-- Page 3: features -->
+      <article class="sheet">
+        <p class="running-head" aria-hidden="true"><span>Not another Overleaf</span><span>§3</span></p>
+
+        <section id="features" class="section">
+          <h2><span class="secnum">3</span> The writing surface</h2>
+          <p class="block">Small things that add up to hours every week. We state them as results.</p>
+
+          <div class="prop block">
+            <p><b>Proposition 1</b> (Hover to see it)<b>.</b> <i>Hovering a <code>\ref</code> or <code>\eqref</code> shows the equation or figure it points to, even from another file. Hovering a <code>\cite</code> shows the title and authors. ⌘-click jumps to the label, the BibTeX entry, or the included file.</i></p>
           </div>
-          <figure class="window"><div class="window-bar" aria-hidden="true"><i></i><i></i><i></i></div><img src="assets/shot-hover-eqref.webp" loading="lazy" width="2000" height="1250" alt="Hovering an equation reference previews the rendered equation from another file"></figure>
-        </article>
+          <figure class="figure">
+            <img src="assets/shot-hover-eqref.webp" loading="lazy" width="1627" height="475" alt="Hovering an equation reference previews the rendered equation from another file">
+            <figcaption><b>Figure 2.</b> An <code>\eqref</code> hover renders equation (3) from <code>sections/method.tex</code>.</figcaption>
+          </figure>
 
-        <article class="feature reverse">
-          <div class="feature-copy">
-            <span class="num">02</span>
-            <h3>Review that lives in the source.</h3>
-            <p>Comments and suggestions are LaTeX macros, not rows in a hidden database. Humans, agents, and <code>git diff</code> all see the same review. Resolved threads keep their history.</p>
+          <div class="prop block">
+            <p><b>Proposition 2</b> (Review lives in the source)<b>.</b> <i>Comments and suggestions are LaTeX macros, not rows in a hidden database. Humans, agents, and <code>git diff</code> all see the same review, and resolved threads keep their history.</i></p>
           </div>
-          <figure class="window"><div class="window-bar" aria-hidden="true"><i></i><i></i><i></i></div><img src="assets/shot-review.webp" loading="lazy" width="2000" height="1250" alt="Review panel with a comment thread and a tracked suggestion"></figure>
-        </article>
+          <figure class="figure">
+            <img src="assets/shot-review.webp" loading="lazy" width="1310" height="878" alt="Review panel with a comment thread and a tracked suggestion">
+            <figcaption><b>Figure 3.</b> A comment thread and a tracked suggestion, both stored in the <code>.tex</code> file.</figcaption>
+          </figure>
 
-        <article class="feature">
-          <div class="feature-copy">
-            <span class="num">03</span>
-            <h3>Know who wrote every character.</h3>
-            <p>Blame mode shows authorship right in the editor — person, agent, or Git commit — and links each range to the checkpoint that introduced it.</p>
+          <div class="pair">
+            <div>
+              <div class="prop block">
+                <p><b>Proposition 3</b> (Blame)<b>.</b> <i>Every character knows who wrote it — a person, an agent, or a Git commit — and links to the checkpoint that introduced it.</i></p>
+              </div>
+              <figure class="figure">
+                <img src="assets/demo-blame.gif" loading="lazy" width="800" height="450" alt="Character-level blame showing who wrote each range">
+                <figcaption><b>Figure 4.</b> Blame mode in the editor.</figcaption>
+              </figure>
+            </div>
+            <div>
+              <div class="prop block">
+                <p><b>Proposition 4</b> (One source of truth)<b>.</b> <i>The live document is <code>main</code>. A <code>git pull</code> always sees the latest text, and a push merges into what your coauthors are typing.</i></p>
+              </div>
+              <figure class="figure">
+                <img src="assets/shot-git.webp" loading="lazy" width="979" height="533" alt="Git access dialog with SSH clone command">
+                <figcaption><b>Figure 5.</b> Clone any paper over SSH.</figcaption>
+              </figure>
+            </div>
           </div>
-          <figure class="window"><div class="window-bar" aria-hidden="true"><i></i><i></i><i></i></div><img src="assets/demo-blame.gif" loading="lazy" alt="Character-level blame showing who wrote each range"></figure>
-        </article>
 
-        <article class="feature reverse">
-          <div class="feature-copy">
-            <span class="num">04</span>
-            <h3>Git without a second source of truth.</h3>
-            <p>The live document <em>is</em> <code>main</code>. Browser edits are checkpointed automatically, so a <code>git pull</code> always sees the latest text, and pushes merge straight into what your coauthors are typing.</p>
+          <h3 class="subsec">3.1 Further results</h3>
+          <dl class="results">
+            <div><dt>SyncTeX</dt><dd>both ways, source to PDF and back.</dd></div>
+            <div><dt>Chapter builds</dt><dd>compile only the chapter you are on.</dd></div>
+            <div><dt>Readable logs</dt><dd>jump to the first fatal error.</dd></div>
+            <div><dt>Citations</dt><dd>autocomplete with titles and authors.</dd></div>
+            <div><dt>Project search</dt><dd>regex, with previewed replace.</dd></div>
+            <div><dt>History</dt><dd>per-file diffs and one-click restore.</dd></div>
+            <div><dt>Phones</dt><dd>read the PDF and edit the source.</dd></div>
+            <div><dt>Interface</dt><dd>English, 中文, 日本語.</dd></div>
+          </dl>
+        </section>
+
+        <p class="folio" aria-hidden="true"><span></span><span>3</span></p>
+      </article>
+
+      <!-- Page 4: comparison, deployment, open problems, references -->
+      <article class="sheet">
+        <p class="running-head" aria-hidden="true"><span>Not another Overleaf</span><span>§4–6</span></p>
+
+        <section id="compare" class="section">
+          <h2><span class="secnum">4</span> Comparison with Overleaf</h2>
+          <div class="table-wrap">
+            <table class="booktabs compare">
+              <caption><b>Table 2.</b> LaTeX Coder and Overleaf, side by side.<sup>†</sup></caption>
+              <thead><tr><th scope="col"></th><th scope="col">LaTeX Coder</th><th scope="col">Overleaf</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">Price</th><td data-label="LaTeX Coder">Free, MIT licensed</td><td data-label="Overleaf">Free tier; key features on paid plans</td></tr>
+                <tr><th scope="row">Git</th><td data-label="LaTeX Coder">Real repository per project, SSH, merge on push</td><td data-label="Overleaf">Git Bridge on paid plans, one linear branch</td></tr>
+                <tr><th scope="row">Review and Git</th><td data-label="LaTeX Coder">Review travels with the source</td><td data-label="Overleaf">Pushing can displace comments and tracked changes</td></tr>
+                <tr><th scope="row">AI agents</th><td data-label="LaTeX Coder">Checked edit API, propose-only mode</td><td data-label="Overleaf">No checked edit API for external agents</td></tr>
+                <tr><th scope="row">Guests</th><td data-label="LaTeX Coder">Link access, no account</td><td data-label="Overleaf">Account-based, collaborator limits by plan</td></tr>
+                <tr><th scope="row">Hosting</th><td data-label="LaTeX Coder">Your server, or one click on Railway</td><td data-label="Overleaf">Overleaf cloud, or separate on-premises products</td></tr>
+              </tbody>
+            </table>
           </div>
-          <figure class="window"><div class="window-bar" aria-hidden="true"><i></i><i></i><i></i></div><img src="assets/shot-git.webp" loading="lazy" width="2000" height="1250" alt="Git access dialog with SSH clone command"></figure>
-        </article>
+          <p class="footnote"><sup>†</sup> From Overleaf’s public documentation on <a href="https://docs.overleaf.com/getting-started/free-and-premium-plans/premium-features">plans</a> and <a href="https://docs.overleaf.com/integrations-and-add-ons/git-integration-and-github-synchronization/git-integration/advanced-git-operations">Git</a>.</p>
+        </section>
 
-        <ul class="mini-grid" aria-label="More features">
-          <li><b>SyncTeX</b> both ways — source to PDF and back.</li>
-          <li><b>Chapter builds</b> compile just the chapter you are on.</li>
-          <li><b>Readable logs</b> that jump to the first fatal error.</li>
-          <li><b>Citation autocomplete</b> with titles and authors.</li>
-          <li><b>Project search</b> with regex and previewed replace.</li>
-          <li><b>History</b> with per-file diffs and one-click restore.</li>
-          <li><b>Markdown</b> notes beside LaTeX, with live preview.</li>
-          <li><b>English, 中文, 日本語</b> interface.</li>
-        </ul>
-      </section>
-
-      <section class="compare" id="compare">
-        <div class="section-head">
-          <p class="kicker">Side by side</p>
-          <h2>LaTeX Coder vs. Overleaf</h2>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th></th><th>LaTeX Coder</th><th>Overleaf</th></tr></thead>
-            <tbody>
-              <tr><th>Price</th><td>Free, MIT licensed</td><td>Free tier; key features on paid plans</td></tr>
-              <tr><th>Git</th><td><span class="yes">Real repo per project</span>, SSH, merge on push</td><td>Git Bridge on paid plans, one linear branch</td></tr>
-              <tr><th>Reviews + Git</th><td><span class="yes">Review data travels with the source</span></td><td>Pushing can displace comments and tracked changes</td></tr>
-              <tr><th>AI agents</th><td><span class="yes">Checked edit API</span>, propose-only mode</td><td>No checked edit API for external agents</td></tr>
-              <tr><th>Guests</th><td><span class="yes">Link access, no account</span></td><td>Account-based, collaborator limits by plan</td></tr>
-              <tr><th>Hosting</th><td>Your server or one-click Railway</td><td>Overleaf cloud, or separate on-prem products</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <p class="fine">Based on Overleaf’s public documentation for <a href="https://docs.overleaf.com/getting-started/free-and-premium-plans/premium-features">plans</a> and <a href="https://docs.overleaf.com/integrations-and-add-ons/git-integration-and-github-synchronization/git-integration/advanced-git-operations">Git</a>.</p>
-      </section>
-
-      <section class="deploy" id="deploy">
-        <img src="assets/l-keycap.svg" width="76" height="76" alt="">
-        <h2>Your lab’s own LaTeX editor,<br><em>five minutes from now.</em></h2>
-        <p class="lede">One click on Railway, or Docker on any server. Full TeX Live installs itself on first start.</p>
-        <div class="actions">
-          <a class="button primary" href="https://railway.com/deploy/latexcoder?referralCode=4KUZ4o&amp;utm_medium=integration&amp;utm_source=template&amp;utm_campaign=generic">Deploy on Railway <span aria-hidden="true">→</span></a>
-          <a class="button ghost" href="https://github.com/EvoEvolver/LatexCoder#deploy-with-docker-or-railway">Self-host with Docker</a>
-        </div>
-<pre class="snippet"><code>git clone https://github.com/EvoEvolver/LatexCoder && cd LatexCoder
+        <section id="deploy" class="section">
+          <h2><span class="secnum">5</span> Deployment</h2>
+          <p class="block">Your lab’s own LaTeX editor, five minutes from now. One click on Railway, or Docker on any server. Full TeX Live installs itself on first start; Tectonic works while it does.</p>
+          <div class="block actions">
+            <a class="btn primary" href="https://railway.com/deploy/latexcoder?referralCode=4KUZ4o&amp;utm_medium=integration&amp;utm_source=template&amp;utm_campaign=generic">Deploy on Railway <span aria-hidden="true">→</span></a>
+            <a class="btn" href="https://github.com/EvoEvolver/LatexCoder#deploy-with-docker-or-railway">Self-host with Docker</a>
+          </div>
+          <figure class="listing block">
+<pre><code>git clone https://github.com/EvoEvolver/LatexCoder && cd LatexCoder
 docker build -t latexcoder .
 docker run -p 8090:8080 -v latexcoder-data:/data \
   -e LATEXCODER_ADMIN_PASSWORD=… latexcoder</code></pre>
-        <div class="wish">
-          <p><b>What has Overleaf never built for you?</b> Tell us. The most requested features go to the top of our list.</p>
-          <a class="button ghost" href="https://github.com/EvoEvolver/LatexCoder/issues/new">Request a feature <span aria-hidden="true">→</span></a>
-        </div>
-      </section>
+            <figcaption><b>Listing 2.</b> Self-hosting with Docker.</figcaption>
+          </figure>
+        </section>
+
+        <section id="wish" class="section">
+          <h2><span class="secnum">6</span> Open problems</h2>
+          <div class="block annotated">
+            <p>What has Overleaf never built for you? We leave this as an exercise for the reader: <mark class="mk red" id="m-wish">tell us</mark>, and the most requested features go to the top of our list.</p>
+            <aside class="note red" data-for="m-wish">open an issue, we read every one</aside>
+          </div>
+          <div class="block actions">
+            <a class="btn" href="https://github.com/EvoEvolver/LatexCoder/issues/new">Request a feature <span aria-hidden="true">→</span></a>
+          </div>
+        </section>
+
+        <section class="references" aria-labelledby="refs">
+          <h2 id="refs">References</h2>
+          <ol>
+            <li>LaTeX Coder. Source code and documentation. <a href="https://github.com/EvoEvolver/LatexCoder">github.com/EvoEvolver/LatexCoder</a>.</li>
+            <li>Biblock. An auditable bibliography workflow for humans and agents. <a href="https://github.com/EvoEvolver/biblock">github.com/EvoEvolver/biblock</a>.</li>
+            <li>MIT License. <a href="https://github.com/EvoEvolver/LatexCoder/blob/main/LICENSE">github.com/EvoEvolver/LatexCoder/blob/main/LICENSE</a>.</li>
+          </ol>
+        </section>
+
+        <p class="folio" aria-hidden="true"><span>Write together. Own the source.</span><span>4</span></p>
+      </article>
     </main>
 
-    <footer>
-      <span class="brand small"><img src="assets/l-keycap.svg" width="20" height="20" alt=""> LaTeX Coder</span>
-      <span>Write together. Own the source.</span>
-      <span class="links"><a href="https://github.com/EvoEvolver/LatexCoder">GitHub</a><a href="https://github.com/EvoEvolver/biblock">Biblock</a><a href="https://github.com/EvoEvolver/LatexCoder/blob/main/LICENSE">MIT License</a></span>
-    </footer>
+    <script>
+      const wide = matchMedia("(min-width: 1101px)");
+
+      // Margin notes sit level with the text they mark, never overlapping each other.
+      function placeNotes() {
+        document.querySelectorAll(".annotated").forEach((block) => {
+          let floor = 0;
+          block.querySelectorAll(".note[data-for]").forEach((note) => {
+            if (!wide.matches) { note.style.top = ""; return; }
+            const mark = document.getElementById(note.dataset.for);
+            const want = mark ? mark.getBoundingClientRect().top - block.getBoundingClientRect().top - 4 : 0;
+            const top = Math.max(want, floor);
+            note.style.top = top + "px";
+            floor = top + note.offsetHeight + 10;
+          });
+        });
+      }
+
+      // Line numbers every fifth typeset line, as lineno prints them on a proof.
+      function numberLines() {
+        document.querySelectorAll(".sheet").forEach((sheet) => {
+          sheet.querySelector(".lineno")?.remove();
+          const gutter = document.createElement("div");
+          gutter.className = "lineno";
+          gutter.setAttribute("aria-hidden", "true");
+          const origin = sheet.getBoundingClientRect().top;
+          let line = 0;
+          sheet.querySelectorAll("h1, h2, h3, .sheet p:not(.running-head):not(.folio), li").forEach((el) => {
+            // Like lineno, count running text only: skip tables, figures, and notes.
+            if (el.closest(".note, table, figure, .results, .references") || el.querySelector("p, li")) return;
+            const rect = el.getBoundingClientRect();
+            const step = parseFloat(getComputedStyle(el).lineHeight) || 24;
+            const count = Math.max(1, Math.round(rect.height / step));
+            for (let i = 0; i < count; i++) {
+              line++;
+              if (line % 5) continue;
+              const n = document.createElement("span");
+              n.textContent = line;
+              n.style.top = (rect.top - origin + i * step + step / 2) + "px";
+              gutter.append(n);
+            }
+          });
+          sheet.prepend(gutter);
+        });
+      }
+
+      function layout() { placeNotes(); numberLines(); }
+      document.fonts.ready.then(layout);
+      addEventListener("resize", () => requestAnimationFrame(layout));
+
+      // Pointing at a margin note highlights the text it marks, and vice versa.
+      document.querySelectorAll(".note[data-for]").forEach((note) => {
+        const mark = document.getElementById(note.dataset.for);
+        if (!mark) return;
+        const on = () => { note.classList.add("lit"); mark.classList.add("lit"); };
+        const off = () => { note.classList.remove("lit"); mark.classList.remove("lit"); };
+        for (const el of [note, mark]) {
+          el.addEventListener("pointerenter", on);
+          el.addEventListener("pointerleave", off);
+        }
+      });
+
+      // Pencil marks draw on once, when their page comes into view.
+      const marks = document.querySelectorAll(".mk, .note");
+      if ("IntersectionObserver" in window && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        document.documentElement.classList.add("pencil");
+        const io = new IntersectionObserver((entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            entry.target.classList.add("drawn");
+            io.unobserve(entry.target);
+          }
+        }, { rootMargin: "0px 0px -15% 0px" });
+        marks.forEach((m) => io.observe(m));
+      }
+    </script>
   </body>
 </html>

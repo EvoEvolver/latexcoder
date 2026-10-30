@@ -1,0 +1,442 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-30T05:26:50+00:00",
+  "title": "Design System: LaTeX Coder",
+  "extensions": {
+    "colorMeta": {
+      "blotter": {
+        "role": "neutral",
+        "displayName": "Blotter Green",
+        "tonalRamp": [
+          "#060d0a",
+          "#162a23",
+          "#294a3e",
+          "#406c5c",
+          "#618d7d",
+          "#8baea0",
+          "#b8cfc6",
+          "#e6f2ed"
+        ],
+        "note": "Deliberate darker replacement of the #0f4f3b named in the direction contract."
+      },
+      "blotter-ink": {
+        "role": "neutral",
+        "displayName": "Blotter Ink",
+        "tonalRamp": [
+          "#0a0c0b",
+          "#232624",
+          "#3e4440",
+          "#5c635e",
+          "#7d857f",
+          "#a0a7a2",
+          "#c6cac7",
+          "#edefee"
+        ]
+      },
+      "blotter-dim": {
+        "role": "neutral",
+        "displayName": "Blotter Dim",
+        "tonalRamp": [
+          "#080c0a",
+          "#1e2823",
+          "#36463e",
+          "#51675c",
+          "#71897d",
+          "#97aaa0",
+          "#c0cdc6",
+          "#eaf0ed"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Proof Paper",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252524",
+          "#43423f",
+          "#62615e",
+          "#83827f",
+          "#a6a5a2",
+          "#c9c9c7",
+          "#efeeed"
+        ]
+      },
+      "listing-paper": {
+        "role": "neutral",
+        "displayName": "Listing Paper",
+        "tonalRamp": [
+          "#0b0b0a",
+          "#262522",
+          "#43423e",
+          "#63615b",
+          "#84827c",
+          "#a6a5a0",
+          "#cac9c6",
+          "#efeeed"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252524",
+          "#424240",
+          "#61615f",
+          "#828280",
+          "#a5a5a3",
+          "#c9c9c8",
+          "#eeeeee"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Ink 2",
+        "tonalRamp": [
+          "#0b0b0a",
+          "#262523",
+          "#43423e",
+          "#62615c",
+          "#83827d",
+          "#a6a5a0",
+          "#cac9c6",
+          "#efeeed"
+        ]
+      },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "Ink 3",
+        "tonalRamp": [
+          "#0b0b0a",
+          "#262522",
+          "#43423d",
+          "#63615a",
+          "#84827b",
+          "#a7a59f",
+          "#cac9c5",
+          "#efeeec"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "tonalRamp": [
+          "#0c0b0a",
+          "#262521",
+          "#44423b",
+          "#646158",
+          "#858279",
+          "#a7a59d",
+          "#cbc9c4",
+          "#efeeec"
+        ]
+      },
+      "red-pencil": {
+        "role": "secondary",
+        "displayName": "Red Pencil",
+        "tonalRamp": [
+          "#1a0403",
+          "#480b07",
+          "#7c120c",
+          "#b0221a",
+          "#d84c3e",
+          "#f08071",
+          "#ffb3a7",
+          "#ffe4de"
+        ]
+      },
+      "blue-pencil": {
+        "role": "tertiary",
+        "displayName": "Blue Pencil",
+        "tonalRamp": [
+          "#040a1b",
+          "#0d234c",
+          "#193d83",
+          "#2a5bba",
+          "#4a7ee0",
+          "#79a4f4",
+          "#accaff",
+          "#e1efff"
+        ]
+      },
+      "press-green": {
+        "role": "primary",
+        "displayName": "Press Green",
+        "tonalRamp": [
+          "#030e09",
+          "#062d1f",
+          "#064f37",
+          "#147253",
+          "#409573",
+          "#76b599",
+          "#acd4c1",
+          "#e1f4ea"
+        ]
+      },
+      "press-green-deep": {
+        "role": "primary",
+        "displayName": "Press Green Deep",
+        "tonalRamp": [
+          "#040e09",
+          "#0d2c20",
+          "#174d39",
+          "#287055",
+          "#4d9275",
+          "#7db39b",
+          "#b0d3c2",
+          "#e3f3eb"
+        ]
+      },
+      "red-wash": {
+        "role": "secondary",
+        "displayName": "Red Wash",
+        "note": "Lit state for human marks."
+      },
+      "blue-wash": {
+        "role": "tertiary",
+        "displayName": "Blue Wash",
+        "note": "Lit state for agent marks and text selection."
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Paper title on the first sheet only."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Lead-in sentence opening a section."
+      },
+      "title": {
+        "displayName": "Section head",
+        "purpose": "Numbered section heads."
+      },
+      "subtitle": {
+        "displayName": "Subsection",
+        "purpose": "Numbered subsections and References."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Running text."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Figure, table and listing captions."
+      },
+      "running-head": {
+        "displayName": "Running head",
+        "purpose": "Small-caps running heads; folios at the same size."
+      },
+      "label": {
+        "displayName": "Button label",
+        "purpose": "CMU Sans for controls only."
+      },
+      "nav": {
+        "displayName": "Desk bar",
+        "purpose": "Navigation on the blotter."
+      },
+      "mono": {
+        "displayName": "Listing",
+        "purpose": "Code listings and inline code."
+      },
+      "hand": {
+        "displayName": "Pencil hand",
+        "purpose": "Margin notes only (Kalam, Google Fonts)."
+      }
+    },
+    "fonts": [
+      {
+        "family": "CMU Serif",
+        "source": "site/assets/fonts (self-hosted subsets: 500 roman, 700 roman, 500 italic)"
+      },
+      {
+        "family": "CMU Sans",
+        "source": "site/assets/fonts (500, 700)"
+      },
+      {
+        "family": "CMU Typewriter",
+        "source": "site/assets/fonts (500)"
+      },
+      {
+        "family": "Kalam",
+        "source": "Google Fonts, 400 and 700"
+      }
+    ],
+    "shadows": [
+      {
+        "name": "sheet",
+        "value": "0 2px 4px rgba(0,0,0,0.18), 0 28px 60px -18px rgba(0,0,0,0.5)",
+        "purpose": "Proof sheet lying on the blotter."
+      },
+      {
+        "name": "press",
+        "value": "0 1px 1px rgba(0,0,0,0.14), 0 6px 14px -6px rgba(0,0,0,0.35)",
+        "purpose": "Primary button only."
+      },
+      {
+        "name": "inked-outline",
+        "value": "inset 0 0 0 1.5px var(--ink)",
+        "purpose": "Secondary button stroke."
+      },
+      {
+        "name": "desk-outline",
+        "value": "inset 0 0 0 1px rgba(228,237,231,0.28)",
+        "purpose": "GitHub control on the desk bar."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state",
+        "value": "160ms ease-out",
+        "purpose": "Hover color, button press, mark wash."
+      },
+      {
+        "name": "note-nudge",
+        "value": "200ms ease-out",
+        "purpose": "Margin note moves 4px toward its mark when lit."
+      },
+      {
+        "name": "pencil-draw",
+        "value": "700ms cubic-bezier(0.16, 1, 0.3, 1) 200ms",
+        "purpose": "Marks draw across once on load (script opt-in)."
+      },
+      {
+        "name": "note-arrive",
+        "value": "opacity 500ms ease-out 650ms, transform 500ms cubic-bezier(0.16, 1, 0.3, 1) 650ms",
+        "purpose": "Notes fade up after their marks."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "transition: none",
+        "purpose": "prefers-reduced-motion disables all transitions and smooth scroll."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "notes-inline",
+        "value": "1100px",
+        "purpose": "Gutters 64px, margin notes drop inline."
+      },
+      {
+        "name": "phone",
+        "value": "760px",
+        "purpose": "Gutters 34/18px, nav hidden, tables restack, single column."
+      }
+    ],
+    "focus": {
+      "value": "outline: 2px solid var(--blue); outline-offset: 3px; border-radius: 3px",
+      "purpose": "Global focus ring in Blue Pencil."
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one press-green action per row, e.g. Deploy on Railway.",
+      "html": "<a class=\"ds-btn-primary\" href=\"#\">Deploy on Railway <span aria-hidden=\"true\">→</span></a>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:8px;min-height:48px;padding:0 22px;border-radius:8px;background:#0b6e4f;color:#fff;font-family:\"CMU Sans\",system-ui,sans-serif;font-weight:600;font-size:16px;line-height:1;text-decoration:none;box-shadow:0 1px 1px rgba(0,0,0,.14),0 6px 14px -6px rgba(0,0,0,.35);transition:background-color 160ms ease-out,transform 160ms ease-out}.ds-btn-primary:hover{background:#085a40}.ds-btn-primary:active{transform:translateY(1px)}.ds-btn-primary:focus-visible{outline:2px solid #2152b0;outline-offset:3px}"
+    },
+    {
+      "name": "Ink Button",
+      "kind": "button",
+      "refersTo": "button-ink",
+      "description": "Secondary action on the sheet: an inked outline that fills with ink on hover.",
+      "html": "<a class=\"ds-btn-ink\" href=\"#\">Star on GitHub</a>",
+      "css": ".ds-btn-ink{display:inline-flex;align-items:center;gap:8px;min-height:48px;padding:0 22px;border-radius:8px;box-shadow:inset 0 0 0 1.5px #1b1b19;color:#1b1b19;background:#fdfcf8;font-family:\"CMU Sans\",system-ui,sans-serif;font-weight:600;font-size:16px;line-height:1;text-decoration:none;transition:background-color 160ms ease-out,color 160ms ease-out,transform 160ms ease-out}.ds-btn-ink:hover{background:#1b1b19;color:#fdfcf8}.ds-btn-ink:active{transform:translateY(1px)}.ds-btn-ink:focus-visible{outline:2px solid #2152b0;outline-offset:3px}"
+    },
+    {
+      "name": "Desk Bar",
+      "kind": "nav",
+      "refersTo": "desk-nav-link",
+      "description": "Sticky navigation on the blotter: serif brand, dim sans links, outlined GitHub control.",
+      "html": "<header class=\"ds-desk\"><a class=\"ds-brand\" href=\"#\">LaTeX Coder</a><nav><a href=\"#\">Story</a><a href=\"#\">Agents</a><a href=\"#\">Features</a></nav><a class=\"ds-gh\" href=\"#\">Star on GitHub</a></header>",
+      "css": ".ds-desk{display:flex;align-items:center;gap:32px;padding:14px 24px;background:#0f3d2f;color:#e4ede7;font-family:\"CMU Sans\",system-ui,sans-serif;font-weight:500;font-size:15px;line-height:1}.ds-brand{margin-right:auto;color:#e4ede7;text-decoration:none;font:700 21px/1 \"CMU Serif\",Georgia,serif}.ds-desk nav{display:flex;gap:26px}.ds-desk nav a{color:#a9c2b5;text-decoration:none;transition:color 160ms ease-out}.ds-desk nav a:hover{color:#fff}.ds-gh{padding:9px 14px;border-radius:8px;box-shadow:inset 0 0 0 1px rgba(228,237,231,.28);color:#e4ede7;text-decoration:none}.ds-gh:hover{color:#fff}.ds-desk a:focus-visible{outline:2px solid #2152b0;outline-offset:3px}"
+    },
+    {
+      "name": "Proof Sheet",
+      "kind": "card",
+      "refersTo": "proof-sheet",
+      "description": "A paper sheet on the blotter with running head, section head and folio.",
+      "html": "<div class=\"ds-desk-ground\"><article class=\"ds-sheet\"><p class=\"ds-rh\"><span>Not another Overleaf</span><span>§1</span></p><h2 class=\"ds-h2\">1 How this started</h2><p class=\"ds-p\">We wanted our research group to have its own editor, on its own server.</p><p class=\"ds-folio\"><span></span><span>1</span></p></article></div>",
+      "css": ".ds-desk-ground{background:#0f3d2f;padding:24px}.ds-sheet{background:#fdfcf8;color:#1b1b19;padding:28px 40px 28px 48px;box-shadow:0 2px 4px rgba(0,0,0,.18),0 28px 60px -18px rgba(0,0,0,.5);font:400 19px/1.55 \"CMU Serif\",Georgia,serif}.ds-rh,.ds-folio{display:flex;justify-content:space-between;color:#6b6962;font-size:15px;line-height:1.4;margin:0}.ds-rh{font-variant:small-caps;letter-spacing:.02em;padding-bottom:10px;border-bottom:.6px solid #1b1b19}.ds-folio{margin-top:32px}.ds-folio span:last-child{color:#1b1b19}.ds-h2{font:700 30px/1.2 \"CMU Serif\",Georgia,serif;letter-spacing:-.01em;margin:28px 0 14px}.ds-p{margin:0}"
+    },
+    {
+      "name": "Booktabs Table",
+      "kind": "custom",
+      "description": "Caption above, heavy top and bottom rules, light midrule, no vertical rules.",
+      "html": "<table class=\"ds-bt\"><caption><b>Table 1.</b> What got in the way.</caption><thead><tr><th>Problem</th><th>LaTeX Coder</th></tr></thead><tbody><tr><td>Review a push can wipe out</td><td>Review as LaTeX macros in the source.</td></tr><tr><td>Collaborator limits</td><td>Share links, no seat count.</td></tr></tbody></table>",
+      "css": ".ds-bt{width:100%;border-collapse:collapse;background:#fdfcf8;color:#1b1b19;font:400 17px/1.4 \"CMU Serif\",Georgia,serif}.ds-bt caption{caption-side:top;text-align:left;margin-bottom:10px;color:#4a4944;font-size:16px}.ds-bt thead th{text-align:left;padding:9px 14px 8px 0;border-top:1.6px solid #1b1b19;border-bottom:.8px solid #1b1b19}.ds-bt td{padding:9px 14px 9px 0;vertical-align:top}.ds-bt td:first-child{color:#4a4944}.ds-bt tbody tr:last-child>*{border-bottom:1.6px solid #1b1b19}"
+    },
+    {
+      "name": "Pencil Mark with Margin Note",
+      "kind": "custom",
+      "refersTo": "margin-note-red",
+      "description": "Signature: red (human) and blue (agent) pencil marks with handwritten notes; hover lights the mark.",
+      "html": "<div class=\"ds-annot\"><p>Review lives <mark class=\"ds-mk ds-red\">in the source</mark>, and agents edit <ins class=\"ds-mk ds-blue\">without overwriting anyone</ins>.</p><aside class=\"ds-note ds-red\"><b>Xiao</b> so comments survive git push?</aside><aside class=\"ds-note ds-blue\"><b>claude-code</b> suggestion, accepted</aside></div>",
+      "css": ".ds-annot{background:#fdfcf8;color:#1b1b19;padding:20px;font:400 19px/1.55 \"CMU Serif\",Georgia,serif}.ds-annot p{margin:0 0 12px}.ds-mk{color:inherit;text-decoration:none;background-color:transparent;background-repeat:no-repeat;background-size:100% 2px;background-position:0 92%;transition:background-color 160ms ease-out}.ds-mk.ds-red{background-image:linear-gradient(#bf3328,#bf3328)}.ds-mk.ds-blue{background-image:linear-gradient(#2152b0,#2152b0)}.ds-mk.ds-red:hover{background-color:rgba(191,51,40,.13)}.ds-mk.ds-blue:hover{background-color:rgba(33,82,176,.12)}.ds-note{display:block;margin:6px 0 0 18px;font:400 18px/1.25 \"Kalam\",\"Comic Sans MS\",cursive;transform:rotate(-0.6deg);transition:transform 200ms ease-out}.ds-note:hover{transform:rotate(-0.6deg) translateX(-4px)}.ds-note b{margin-right:6px;font-size:15px}.ds-note.ds-red{color:#bf3328}.ds-note.ds-blue{color:#2152b0}"
+    },
+    {
+      "name": "Code Listing",
+      "kind": "custom",
+      "refersTo": "listing",
+      "description": "Typewriter listing on slightly darker stock with a caption below.",
+      "html": "<figure class=\"ds-listing\"><pre><code>docker run -p 8090:8080 latexcoder</code></pre><figcaption><b>Listing 2.</b> Self-hosting with Docker.</figcaption></figure>",
+      "css": ".ds-listing{margin:0;background:#fdfcf8;padding:12px}.ds-listing pre{margin:0;padding:18px 20px;overflow-x:auto;background:#f3f1ea;border-left:.6px solid #d9d6cc;color:#1b1b19;font:400 15.5px/1.6 \"CMU Typewriter\",ui-monospace,Menlo,monospace}.ds-listing figcaption{margin-top:12px;color:#4a4944;font:400 16px/1.45 \"CMU Serif\",Georgia,serif}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Galley Proof on the Lab Desk",
+    "overview": "**Creative North Star: \"The Galley Proof on the Lab Desk\"**\n\nThe website is a typeset LaTeX paper in proof: white sheets set in Computer Modern, with running heads, folios, line numbers every fifth line, numbered sections, booktabs tables, propositions, an algorithm block, code listings, captioned figures and a reference list. The sheets lie on a deep green desk blotter, and coauthors and an agent have already marked them up: red pencil for people, blue pencil for the agent, handwritten notes in the outer margin anchored to the words they mark. Everything the page says, it says as part of the paper; there is no landing-page chrome on the paper.\n\nDensity is that of a real article: long measure, justified abstract, generous section breaks, and evidence carried by numbered figures that are real product screenshots. The world refuses the dev-tool landing page (centred hero over a window screenshot, icon-card grids). The proof-sheet ground, blotter and pencil system are the reusable signature; the specific story told on the first sheet belongs to the surface brief (`.impeccable/surfaces/site-index-html.md`), not here.\n\nThe blotter ground is #0f3d2f, a deliberate darker replacement of the #0f4f3b named in the direction contract: the darker green makes the paper sheets read as lit objects on a desk and keeps the primary green action distinct from the ground.",
+    "keyCharacteristics": [
+      "Green blotter ground, white proof sheets with a soft cast shadow, square corners.",
+      "Computer Modern everywhere on the sheet (serif for text, sans for controls, typewriter for code); Kalam handwriting only for pencil notes.",
+      "Paper apparatus as structure: running head, folio, line numbers, section numbers, captions, booktabs rules.",
+      "Two pencils with fixed meanings: red is a human, blue is an agent.",
+      "Brand green only on the blotter and the primary action.",
+      "Marks draw on once, in pencil; pointing at a note lights the text it marks."
+    ],
+    "rules": [
+      {
+        "name": "The Two Pencils Rule",
+        "body": "Red always means a person, blue always means an agent. Never swap them and never use either as decoration without a mark it belongs to.",
+        "section": "colors"
+      },
+      {
+        "name": "The Press Green Rule",
+        "body": "Green appears on the desk and on the primary action. On the paper it is the one button you are meant to press.",
+        "section": "colors"
+      },
+      {
+        "name": "The Typeset Rule",
+        "body": "Every heading, label and number on the sheet uses a device LaTeX would print: section numbers, \"Figure n.\", \"Table n.\", \"Proposition n\", \"Algorithm n\", small-caps running heads. No eyebrows or kickers above headings.",
+        "section": "typography"
+      },
+      {
+        "name": "The One Hand Rule",
+        "body": "Kalam appears only inside pencil notes and the insertion caret. Nothing typeset is ever handwritten.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Ink Rule",
+        "body": "Nothing printed on the sheet casts a shadow. Only the sheet itself, and the primary action, sit above their ground.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** set the blotter ground at #0f3d2f (`blotter`); it is the recorded, deliberate replacement for the contract's #0f4f3b.",
+      "**Do** express every new section as part of the paper: a numbered section, a numbered figure with a caption, a booktabs table, a proposition, an algorithm, or a listing.",
+      "**Do** keep red for people and blue for agents in every mark and note.",
+      "**Do** use real product screenshots as figures, framed with a hairline and captioned.",
+      "**Do** keep controls in CMU Sans and everything typeset in CMU Serif."
+    ],
+    "donts": [
+      "**Don't** put brand green on the paper except as the primary action fill.",
+      "**Don't** round sheets, figures, tables or listings; only controls carry the 8px radius.",
+      "**Don't** add shadows to anything printed on the sheet.",
+      "**Don't** set typeset text in Kalam or use Kalam outside pencil notes.",
+      "**Don't** put eyebrows or kickers above headings; use LaTeX's own numbering.",
+      "**Don't** build centred hero-over-screenshot layouts or icon-card grids on this site."
+    ]
+  }
+}

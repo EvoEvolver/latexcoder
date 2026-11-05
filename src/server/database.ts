@@ -456,6 +456,26 @@ export class StateDatabase {
     `).run(projectId, username, role, joinedAt);
   }
 
+  /**
+   * Removes a non-owner member together with their personal share secrets and
+   * every project session opened through those secrets. Returns the removed
+   * share id (null when the member never created one), or false when the user
+   * is not a removable member.
+   */
+  removeProjectMember(projectId: string, username: string): { shareId: string | null } | false {
+    return this.transaction(() => {
+      const member = this.db.prepare("SELECT role FROM project_members WHERE project_id = ? AND username = ?").get(projectId, username) as SqlRow | undefined;
+      if (!member || member.role === "owner") return false;
+      const share = this.getProjectShareForUser(projectId, username);
+      if (share) {
+        this.db.prepare("DELETE FROM project_sessions WHERE project_id = ? AND share_id = ?").run(projectId, share.id);
+        this.db.prepare("DELETE FROM project_shares WHERE id = ?").run(share.id);
+      }
+      this.db.prepare("DELETE FROM project_members WHERE project_id = ? AND username = ?").run(projectId, username);
+      return { shareId: share?.id ?? null };
+    });
+  }
+
   listProjectMembers(projectId: string) {
     return (this.db.prepare(`
       SELECT project_members.username, project_members.role, project_members.joined_at,

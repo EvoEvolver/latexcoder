@@ -164,6 +164,18 @@ export function registerProjectRoutes(app: RouteApp, context: ProjectRouteContex
       response.json({ members: database.listProjectMembers(runtime.id) });
     } catch (error) { next(error); }
   });
+  app.delete("/v1/project/members/:username", async (request, response, next) => {
+    try {
+      const runtime = await context.resolveProject(request);
+      context.requireProjectOwner(request, runtime);
+      const username = String(request.params.username);
+      const removed = database.removeProjectMember(runtime.id, username);
+      if (!removed) throw apiError("member_not_removable", "only a non-owner project member can be removed", 404);
+      if (removed.shareId) runtime.collaboration.disconnectShare(removed.shareId, "project membership removed");
+      runtime.collaboration.disconnectUser(username, "project membership removed");
+      response.json({ removed: { username }, members: database.listProjectMembers(runtime.id) });
+    } catch (error) { next(error); }
+  });
   app.get("/v1/project/archive", async (request, response, next) => {
     try {
       const runtime = await context.resolveProject(request);

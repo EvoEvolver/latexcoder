@@ -306,7 +306,15 @@ test("invite-only users and project capability sessions enforce access boundarie
     const proposalResult = await proposalEdit.json();
     assert.equal(proposalResult.edit.mode, "suggesting");
     assert.ok(proposalResult.edit.suggestionIds.length > 0);
-    assert.ok(parseReviews(await (await fetch(proposalFileUrl)).text()).some(review => review.author.includes("Coding agent")));
+    assert.ok(parseReviews(await (await fetch(proposalFileUrl)).text()).some(review => review.author === "Agent: Coding agent (member.one) [ag_proposal]"));
+    const namedRead = await fetch(agentFileUrl);
+    const namedSuggestion = await fetch(`${base}/v1/files/edit?${new URLSearchParams({ project: project.id, access: shareToken, path: "main.tex", mode: "suggesting", agentId: "ag_claude", agentName: "Claude" })}`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain", "X-Base-SHA256": namedRead.headers.get("x-content-sha256")! },
+      body: (await namedRead.text()) + "Named agent suggestion\n",
+    });
+    assert.equal(namedSuggestion.status, 200, await namedSuggestion.clone().text());
+    assert.ok(parseReviews(await (await fetch(agentFileUrl)).text()).some(review => review.author === "Agent: Claude (member.one) [ag_claude]"));
     assert.equal((await fetch(`${base}/v1/files?${new URLSearchParams({ project: project.id, access: proposalToken, path: "new.tex" })}`, {
       method: "PUT", headers: { "Content-Type": "text/plain" }, body: "blocked",
     })).status, 403);

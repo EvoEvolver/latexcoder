@@ -26,18 +26,26 @@ test("path validation contains project access", () => {
 
 test("ZIP initializes projects and imports files without overwriting", async () => {
   await withServer(async ({ base }) => {
-    const archive = zipSync({ "paper/paper.tex": strToU8("\\section{Imported}"), "paper/images/a.png": new Uint8Array([1, 2, 3]) });
+    const archive = zipSync({
+      "paper/paper.tex": strToU8("\\section{Imported}"),
+      "paper/images/a.png": new Uint8Array([1, 2, 3]),
+      "paper/.git/refs/heads/imported": strToU8("imported-marker"),
+    });
     const created = await fetch(`${base}/v1/projects?name=ZIP%20paper`, { method: "POST", headers: { "Content-Type": "application/zip" }, body: Buffer.from(archive) });
     assert.equal(created.status, 201);
     const { project } = await created.json();
     assert.equal(project.build.main, "paper.tex");
     assert.equal(await (await fetch(`${base}/v1/files?project=${project.id}&path=paper.tex`)).text(), "\\section{Imported}");
     assert.equal((await fetch(`${base}/v1/files?project=${project.id}&path=main.tex`)).status, 404);
+    assert.equal((await fetch(`${base}/v1/files?project=${project.id}&path=.git/refs/heads/imported`)).status, 404);
     const upload = async files => fetch(`${base}/v1/files/import?project=${project.id}`, { method: "POST", headers: { "Content-Type": "application/zip" }, body: Buffer.from(zipSync(files)) });
     assert.equal((await upload({ "notes.txt": strToU8("hello") })).status, 201);
     assert.equal((await upload({ "notes.txt": strToU8("overwrite"), "other.txt": strToU8("new") })).status, 409);
     assert.equal((await fetch(`${base}/v1/files?project=${project.id}&path=other.txt`)).status, 404);
     assert.equal((await upload({ "../outside.txt": strToU8("bad") })).status, 400);
+    assert.equal((await upload({ "nested/.git/HEAD": strToU8("bad"), "ok.txt": strToU8("fine") })).status, 201);
+    assert.equal(await (await fetch(`${base}/v1/files?project=${project.id}&path=ok.txt`)).text(), "fine");
+    assert.equal((await fetch(`${base}/v1/files?project=${project.id}&path=nested/.git/HEAD`)).status, 404);
     assert.equal((await upload({ ".git/config": strToU8("bad") })).status, 400);
   });
 });

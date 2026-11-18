@@ -35,8 +35,9 @@ export function readProjectZip(body: Uint8Array): ImportedProjectFile[] {
   let total = 0, count = 0, files;
   try {
     files = unzipSync(body, { filter: entry => {
+      if (entry.name.split("/").includes(".git")) return false;
       if (++count > 1000 || entry.originalSize > MAX_FILE_BYTES || (total += entry.originalSize) > 100 * 1024 * 1024) throw apiError("zip_too_large", "ZIP exceeds file count or extracted size limits", 413);
-      if (entry.name.includes("\\") || entry.name.split("/").some(part => part === ".." || part === ".git" || part === ".paper-output")) throw apiError("invalid_zip_path", "ZIP contains an unsafe path");
+      if (entry.name.includes("\\") || entry.name.split("/").some(part => part === ".." || part === ".paper-output")) throw apiError("invalid_zip_path", "ZIP contains an unsafe path");
       if (entry.name.endsWith("/")) return false;
       safeRelativePath(entry.name);
       return !entry.name.startsWith("__MACOSX/") && !entry.name.endsWith(".DS_Store");

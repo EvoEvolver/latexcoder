@@ -1070,6 +1070,15 @@ export async function createPaperServer(options: ServerOptions = {}): Promise<Pa
 
   const isProposalAccess = (runtime: ProjectRuntime, supplied: unknown): boolean => Boolean(findProposalShare(runtime, supplied));
 
+  // Display name of the member whose personal capability link authorized this request, if any.
+  function accessMemberName(runtime: ProjectRuntime, supplied: unknown): string | null {
+    const share = findProjectShare(runtime, supplied) || findProposalShare(runtime, supplied);
+    if (!share?.username) return null;
+    const user = database.getUser(share.username);
+    if (user?.deletedAt) return share.username;
+    return user?.displayName || share.username;
+  }
+
   function sharePaths(runtime: ProjectRuntime, shareId: string, shareToken: string, viewToken: string, proposalToken: string): SharePaths {
     return {
       id: shareId,
@@ -1481,7 +1490,7 @@ export async function createPaperServer(options: ServerOptions = {}): Promise<Pa
   registerSearchRoutes(app, { assertProjectWritable, json: express.json, options, projectSearch, resolveProject });
   registerFileRoutes(app, {
     assertProjectWritable, database, gitAuthorForCommit, gitCheckpoint,
-    isProposalAccess, json: express.json, raw: express.raw, requestBlameActor,
+    accessMemberName, isProposalAccess, json: express.json, raw: express.raw, requestBlameActor,
     resolveProject, withAgentHistory, withGitOperation, withGitReader,
   });
   registerBuildRoutes(app, { compileProject, database, ensureLatestPdf, resolveBuildRuntime, json: express.json, options, resolveProject });

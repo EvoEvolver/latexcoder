@@ -8,7 +8,7 @@ import type { ZodType } from "zod";
 import { blameChangesRequestSchema, type BlameChangeInfo } from "../../shared/api-schema.ts";
 import { parseReviews } from "../../shared/review.ts";
 
-import { apiError, contentPath, isTextFile, MAX_FILE_BYTES, MAX_TEXT_BYTES, readProjectZip, safeRelativePath, sha256 } from "../core.ts";
+import { apiError, attributeAgentToMember, contentPath, isTextFile, MAX_FILE_BYTES, MAX_TEXT_BYTES, readProjectZip, safeRelativePath, sha256 } from "../core.ts";
 import { checkedContentTarget, contentEntries } from "../project-files.ts";
 import type { FileRouteContext, RouteApp } from "./types.ts";
 
@@ -125,9 +125,9 @@ export function registerFileRoutes(app: RouteApp, context: FileRouteContext): vo
       const proposal = context.isProposalAccess(runtime, request.query.access);
       const mode = proposal || request.query.mode === "suggesting" ? "suggesting" : request.query.mode === undefined || request.query.mode === "direct" ? "direct" : null;
       if (!mode) throw apiError("invalid_mode", "mode must be suggesting or direct");
-      const agent = typeof request.query.agentId === "string" && typeof request.query.agentName === "string"
+      const agent = attributeAgentToMember(typeof request.query.agentId === "string" && typeof request.query.agentName === "string"
         ? { id: request.query.agentId.slice(0, 100), name: request.query.agentName.slice(0, 100) }
-        : proposal ? { id: "ag_proposal", name: "Coding agent" } : undefined;
+        : proposal ? { id: "ag_proposal", name: "Coding agent" } : undefined, context.accessMemberName(runtime, request.query.access));
       const { result, version, removedReviews } = await context.withGitReader(runtime, () => context.withGitOperation(runtime, async () => {
         const baseSha256 = request.get("X-Base-SHA256");
         if (!baseSha256 || !/^[a-f0-9]{64}$/.test(baseSha256)) throw apiError("invalid_base_sha256", "X-Base-SHA256 must be a lowercase SHA-256 hex digest");
@@ -176,7 +176,7 @@ export function registerFileRoutes(app: RouteApp, context: FileRouteContext): vo
       const relativePath = safeRelativePath(request.query.path);
       if (!isTextFile(relativePath)) throw apiError("not_text", "only text files can be patched", 415);
       const proposal = context.isProposalAccess(runtime, request.query.access);
-      const result = await context.withAgentHistory(request, runtime, `Agent edit: ${relativePath}`, () => collaboration.patchText(relativePath, request.body?.baseSha256, request.body?.changes, { mode: proposal ? "suggesting" : request.body?.mode, agent: proposal ? (request.body?.agent || { id: "ag_proposal", name: "Coding agent" }) : request.body?.agent }), true);
+      const result = await context.withAgentHistory(request, runtime, `Agent edit: ${relativePath}`, () => collaboration.patchText(relativePath, request.body?.baseSha256, request.body?.changes, { mode: proposal ? "suggesting" : request.body?.mode, agent: attributeAgentToMember(proposal ? (request.body?.agent || { id: "ag_proposal", name: "Coding agent" }) : request.body?.agent, context.accessMemberName(runtime, request.query.access)) }), true);
       collaboration.flush();
       response.setHeader("ETag", `"${result.sha256}"`);
       response.setHeader("X-Content-SHA256", result.sha256);

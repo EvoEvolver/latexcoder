@@ -104,6 +104,7 @@ export interface SearchRouteContext {
 }
 
 export interface FileRouteContext {
+  accessMemberName(runtime: ProjectRuntime, access: unknown): string | null;
   assertProjectWritable(runtime: ProjectRuntime): void;
   database: StateDatabase;
   gitAuthorForCommit(projectDir: string, commit: string): Promise<{ name: string; email: string } | null>;

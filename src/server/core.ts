@@ -138,6 +138,18 @@ export function agentAuthor(agent?: AgentIdentity): string {
   return `Agent: ${name} [${id}]`;
 }
 
+// An agent name is self-declared, so two collaborators' agents can both call
+// themselves "Claude". When the request came through a member's personal
+// capability link, append that member's name so reviewers can tell whose agent
+// made the suggestion. Names that already mention the member are left alone.
+export function attributeAgentToMember(agent: AgentIdentity | undefined, member: string | null): AgentIdentity | undefined {
+  if (!agent || typeof agent.name !== "string" || !member) return agent;
+  const name = agent.name.trim(), owner = member.trim().slice(0, 40);
+  if (!name || !owner || name.toLocaleLowerCase().includes(owner.toLocaleLowerCase())) return agent;
+  const suffix = ` (${owner})`;
+  return { ...agent, name: name.slice(0, Math.max(1, 64 - suffix.length)).trimEnd() + suffix };
+}
+
 export function atomicWriteSync(target: string, bytes: string | Uint8Array): void {
   const temporary = path.join(path.dirname(target), `.${path.basename(target)}.${process.pid}.${randomUUID()}.tmp`);
   writeFileSync(temporary, bytes);

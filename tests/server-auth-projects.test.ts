@@ -469,6 +469,61 @@ test("invite-only users and project capability sessions enforce access boundarie
   }, { authDisabled: false, adminPassword });
 });
 
+test("project owners remove members and revoke their links, guest sessions, and live editors", async () => {
+  const adminPassword = "correct horse battery staple";
+  await withServer(async ({ base, ws }) => {
+    const login = await fetch(`${base}/v1/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "admin", password: adminPassword }),
+    });
+    const ownerCookie = login.headers.get("set-cookie")!.split(";", 1)[0];
+    const invitation = (await (await fetch(`${base}/v1/invitations`, { method: "POST", headers: { Cookie: ownerCookie } })).json()).invitation;
+    const registration = await fetch(`${base}/v1/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: invitation.token, username: "member.one", password: "another secure password" }),
+    });
+    const memberCookie = registration.headers.get("set-cookie")!.split(";", 1)[0];
+    const project = (await (await fetch(`${base}/v1/projects`, {
+      method: "POST",
+      headers: { Cookie: ownerCookie, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Removable Membership" }),
+    })).json()).project;
+    const ownerShare = (await (await fetch(`${base}/v1/project/share?project=${project.id}`, { method: "POST", headers: { Cookie: ownerCookie } })).json()).share;
+    const ownerEditToken = ownerShare.editPath.split("/").at(-1);
+    assert.equal((await fetch(`${base}/v1/project/join/${project.id}/${ownerEditToken}`, { method: "POST", headers: { Cookie: memberCookie } })).status, 200);
+    const memberShare = (await (await fetch(`${base}/v1/project/share?project=${project.id}`, { method: "POST", headers: { Cookie: memberCookie } })).json()).share;
+    const guestExchange = await fetch(`${base}${memberShare.editPath}`, { redirect: "manual" });
+    assert.equal(guestExchange.status, 303);
+    const guestCookie = guestExchange.headers.get("set-cookie")!.split(";", 1)[0];
+    assert.equal((await fetch(`${base}/v1/project?project=${project.id}`, { headers: { Cookie: guestCookie } })).status, 200);
+
+    const room = `${project.id}/${Buffer.from("main.tex").toString("base64url")}`;
+    const socket = new WebSocket(`${ws}/v1/collab/${room}`, { headers: { Cookie: memberCookie } });
+    await new Promise((resolve, reject) => { socket.once("open", resolve); socket.once("error", reject); });
+    const closed = new Promise<number>(resolve => socket.once("close", code => resolve(code)));
+
+    const removeUrl = (username: string) => `${base}/v1/project/members/${encodeURIComponent(username)}?project=${project.id}`;
+    assert.equal((await fetch(removeUrl("admin"), { method: "DELETE", headers: { Cookie: memberCookie } })).status, 403);
+    assert.equal((await fetch(removeUrl("admin"), { method: "DELETE", headers: { Cookie: ownerCookie } })).status, 404);
+    assert.equal((await fetch(removeUrl("nobody"), { method: "DELETE", headers: { Cookie: ownerCookie } })).status, 404);
+    const removed = await fetch(removeUrl("member.one"), { method: "DELETE", headers: { Cookie: ownerCookie } });
+    assert.equal(removed.status, 200);
+    assert.deepEqual((await removed.json()).members.map(member => [member.username, member.role]), [["admin", "owner"]]);
+
+    assert.equal(await closed, 1008);
+    assert.notEqual((await fetch(`${base}/v1/project?project=${project.id}`, { headers: { Cookie: memberCookie } })).status, 200);
+    assert.deepEqual((await (await fetch(`${base}/v1/projects`, { headers: { Cookie: memberCookie } })).json()).projects, []);
+    assert.equal((await fetch(`${base}${memberShare.agentPath}`)).status, 403);
+    assert.equal((await fetch(`${base}${memberShare.editPath}`, { redirect: "manual" })).status, 403);
+    assert.notEqual((await fetch(`${base}${memberShare.clonePath}/info/refs?service=git-upload-pack`)).status, 200);
+    assert.equal((await fetch(`${base}/v1/project?project=${project.id}`, { headers: { Cookie: guestCookie } })).status, 401);
+    assert.equal((await fetch(`${base}${ownerShare.agentPath}`)).status, 200);
+    assert.equal((await fetch(removeUrl("member.one"), { method: "DELETE", headers: { Cookie: ownerCookie } })).status, 404);
+  }, { authDisabled: false, adminPassword });
+});
+
 test("administrators page through users and projects and manage their lifecycle", async () => {
   const adminPassword = "admin control password";
   await withServer(async ({ base, stateDir }) => {

@@ -30,9 +30,10 @@ export type EditOptions = { mode?: EditMode; agent?: AgentIdentity };
 export type EditResult = { source: string; sha256: string; mode: EditMode; suggestionIds: string[]; changeCount?: number };
 
 export interface CollaborationStore {
-  attach(connection: WebSocket, relativePath: string, shareId?: string | null, savedAcknowledgments?: boolean, readOnly?: boolean, actor?: BlameActor): void;
+  attach(connection: WebSocket, relativePath: string, shareId?: string | null, savedAcknowledgments?: boolean, readOnly?: boolean, actor?: BlameActor, username?: string | null): void;
   blame(relativePath: string): { revision: string; runs: BlameRun[] };
   disconnectShare(shareId: string, reason: string): void;
+  disconnectUser(username: string, reason: string): void;
   editFile(relativePath: string, baseSha256: string, updated: string, options?: EditOptions): EditResult;
   flush(): void;
   importText(relativePath: string, source: string, actor?: BlameActor): void;

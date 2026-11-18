@@ -39,6 +39,7 @@ function legacyAttributes(): Record<string, string> {
 export function createCollaborationStore(projectId: string, projectDir: string, database: StateDatabase, onChange: () => void = () => {}): CollaborationStore {
   const docs = new Map<string, SharedDocument>();
   const connectionShares = new WeakMap<WebSocket, string | null>();
+  const connectionUsers = new WeakMap<WebSocket, string | null>();
   const connectionActors = new WeakMap<WebSocket, BlameActor>();
   const savedConnections = new WeakSet<WebSocket>();
   // Change ids already written to the database, so the ids editors repeat
@@ -174,10 +175,10 @@ export function createCollaborationStore(projectId: string, projectDir: string, 
     return shared;
   }
 
-  function attach(connection: WebSocket, relativePath: string, shareId: string | null = null, savedAcknowledgments = false, readOnly = false, actor: BlameActor = { id: "guest", name: "Guest" }): void {
+  function attach(connection: WebSocket, relativePath: string, shareId: string | null = null, savedAcknowledgments = false, readOnly = false, actor: BlameActor = { id: "guest", name: "Guest" }, username: string | null = null): void {
     if (suspended) return connection.close(1012, "project is synchronizing with Git");
     const shared = load(relativePath);
-    shared.connections.set(connection, new Set()); connectionShares.set(connection, shareId); connectionActors.set(connection, actor);
+    shared.connections.set(connection, new Set()); connectionShares.set(connection, shareId); connectionUsers.set(connection, username); connectionActors.set(connection, actor);
     if (savedAcknowledgments) savedConnections.add(connection);
     connection.binaryType = "arraybuffer";
     connection.on("message", raw => {
@@ -361,5 +362,6 @@ export function createCollaborationStore(projectId: string, projectDir: string, 
   function suspend(): void { suspended = true; for (const shared of docs.values()) for (const connection of shared.connections.keys()) connection.close(1012, "project is synchronizing with Git"); flush(); }
   function resume(): void { suspended = false; }
   function disconnectShare(shareId: string, reason: string): void { for (const shared of docs.values()) for (const connection of shared.connections.keys()) if (connectionShares.get(connection) === shareId) connection.close(1008, reason); }
-  return { attach, blame, disconnectShare, editFile, flush, importText, load, move, patchText, readText, remove, replaceText, resume, roomNameForPath, shutdown, suspend };
+  function disconnectUser(username: string, reason: string): void { for (const shared of docs.values()) for (const connection of shared.connections.keys()) if (connectionUsers.get(connection) === username) connection.close(1008, reason); }
+  return { attach, blame, disconnectShare, disconnectUser, editFile, flush, importText, load, move, patchText, readText, remove, replaceText, resume, roomNameForPath, shutdown, suspend };
 }

@@ -583,5 +583,8 @@
   "Add paragraph": "添加段落",
   "Add subparagraph": "添加子段落",
   "one account": "一个账户",
-  "multiple accounts": "多个账户"
+  "multiple accounts": "多个账户",
+  "Remove member": "移除成员",
+  "Remove {{v0}} from this project? Their View, Edit, Agent editing, and Git access links stop working and their open editors are disconnected. Text they wrote and its authorship history are kept.": "要将 {{v0}} 从此项目中移除吗？其查看、编辑、AI 编辑和 Git 访问链接将立即失效，已打开的编辑器也会断开连接。其撰写的内容和作者记录会保留。",
+  "{{name}} was removed from the project.": "已将 {{name}} 从项目中移除。"
 }

@@ -1522,7 +1522,7 @@ export async function createPaperServer(options: ServerOptions = {}): Promise<Pa
       const actor: BlameActor = requestedId || requestedName
         ? { id: requestedId || requestedName, name: requestedName || requestedId }
         : user ? { id: user.username, name: user.displayName } : { id: "guest", name: "Guest" };
-      sockets.handleUpgrade(request, socket, head, connection => runtime.collaboration.attach(connection, relativePath, shareId, url.searchParams.get("saved") === "1", accessMode === "view", actor));
+      sockets.handleUpgrade(request, socket, head, connection => runtime.collaboration.attach(connection, relativePath, shareId, url.searchParams.get("saved") === "1", accessMode === "view", actor, user?.username ?? null));
     })().catch(() => {
       socket.write("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
       socket.destroy();

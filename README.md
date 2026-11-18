@@ -227,7 +227,11 @@ join a single project through a share link, no account required.
 
 Each collaborator gets their own browser, agent, and Git credentials.
 Rotating a collaborator's link credentials revokes their previous links without
-affecting anyone else. SSH keys are managed separately in Account Settings.
+affecting anyone else. The project owner can remove a member from
+**Collaborate → Project Members**; that revokes the member's personal links,
+signs out guests who joined through them, and disconnects their open editors,
+while their text and attribution stay in the project.
+SSH keys are managed separately in Account Settings.
 The admin panel covers user search, password resets,
 account deletion that preserves projects and attribution, and project
 deletion.

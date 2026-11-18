@@ -77,6 +77,7 @@ import {
   Upload,
   UserPlus,
   UserRound,
+  UserRoundX,
   X,
   ZoomIn,
   ZoomOut,
@@ -180,6 +181,7 @@ const ICONS = {
     Upload,
     UserPlus,
     UserRound,
+    UserRoundX,
     X,
     ZoomIn,
     ZoomOut,
@@ -4143,9 +4145,39 @@ async function refreshProjectMembers() {
     const role = document.createElement("span");
     role.className = "shrink-0 text-muted-foreground";
     localizedText(role, () => member.role === "owner" ? t("Owner") : member.role === "viewer" ? t("View") : t("Edit"));
-    row.append(identity, role);
+    const end = document.createElement("span");
+    end.className = "flex shrink-0 items-center gap-2";
+    end.append(role);
+    if (state.projectCanManage && member.role !== "owner") {
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.dataset.removeMember = member.username;
+      remove.className = "danger grid size-6 place-items-center rounded text-destructive hover:bg-accent [&_svg]:size-3.5";
+      remove.innerHTML = '<i data-lucide="user-round-x"></i>';
+      localizedAttribute(remove, "aria-label", () => t("Remove member"));
+      localizedAttribute(remove, "title", () => t("Remove member"));
+      remove.addEventListener("click", () => { void removeProjectMember(member); });
+      end.append(remove);
+    }
+    row.append(identity, end);
     return row;
   }));
+  createIcons({ icons: ICONS });
+}
+
+async function removeProjectMember(member: ProjectMember): Promise<void> {
+  const confirmed = await openActionDialog({
+    title: t("Remove member"),
+    message: t("Remove {{v0}} from this project? Their View, Edit, Agent editing, and Git access links stop working and their open editors are disconnected. Text they wrote and its authorship history are kept.", { v0: member.displayName }),
+    submitLabel: t("Remove member"),
+    danger: true,
+  });
+  if (!confirmed) return;
+  try {
+    await request(`v1/project/members/${encodeURIComponent(member.username)}`, { method: "DELETE" });
+    await refreshProjectMembers();
+    showToast(t("{{name}} was removed from the project.", { name: member.displayName }));
+  } catch (error) { showToast(error.message); }
 }
 
 type CollaboratePanel = "browser" | "agent" | "git" | "members" | "secrets";
